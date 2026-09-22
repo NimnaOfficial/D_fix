@@ -42,11 +42,14 @@ public class AdminActivity extends AppCompatActivity {
             if (id == R.id.nav_dashboard) {
                 loadFragment(new AdminDashboardFragment());
                 return true;
-                        } else if (id == R.id.nav_appointments) {
+            } else if (id == R.id.nav_appointments) {
                 loadFragment(new com.mad.techfix.ui.admin.appointments.AppointmentsFragment());
                 return true;
             } else if (id == R.id.nav_technicians) {
                 loadFragment(new TechnicianListFragment());
+                return true;
+            } else if (id == R.id.nav_reports) {
+                loadFragment(new com.mad.techfix.ui.admin.dashboard.ReportsFragment());
                 return true;
             }
             return false;

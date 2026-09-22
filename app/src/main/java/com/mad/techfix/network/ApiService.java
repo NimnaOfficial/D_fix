@@ -269,4 +269,59 @@ public interface ApiService {
             @Path("id") String deviceId
     );
 
+    // ==========================================
+    // NEW PHASE 1 / MEMBER 4 ENDPOINTS
+    // ==========================================
+    
+    @PUT("api/appointments/{id}/cancel")
+    Call<ApiResponse<Object>> cancelAppointment(
+            @Header("Authorization") String auth,
+            @Path("id") String appointmentId
+    );
+    
+    @POST("api/spare-parts/{id}/adjust")
+    Call<ApiResponse<Object>> adjustStock(
+            @Header("Authorization") String auth,
+            @Path("id") String partId,
+            @Body com.mad.techfix.models.StockAdjustmentRequest request
+    );
+    
+    @POST("api/appointments/{id}/parts")
+    Call<ApiResponse<Object>> addPartToAppointment(
+            @Header("Authorization") String auth,
+            @Path("id") String appointmentId,
+            @Body com.mad.techfix.models.AppointmentPartRequest request
+    );
+
+    @GET("api/appointments/{id}/parts")
+    Call<ApiResponse<List<com.mad.techfix.models.AppointmentPart>>> getAppointmentParts(
+            @Header("Authorization") String auth,
+            @Path("id") String appointmentId
+    );
+
+    // REPORTS
+    @GET("api/reports/summary")
+    Call<ApiResponse<com.mad.techfix.models.reports.ReportSummary>> getReportSummary(
+            @Header("Authorization") String auth
+    );
+
+    @GET("api/reports/revenue")
+    Call<ApiResponse<com.mad.techfix.models.reports.RevenueReport>> getRevenueReport(
+            @Header("Authorization") String auth
+    );
+
+    @GET("api/reports/payments")
+    Call<ApiResponse<List<com.mad.techfix.models.reports.PaymentStatusReport>>> getPaymentReport(
+            @Header("Authorization") String auth
+    );
+
+    @GET("api/reports/spare-parts")
+    Call<ApiResponse<List<com.mad.techfix.models.SparePart>>> getSparePartsReport(
+            @Header("Authorization") String auth
+    );
+
+    @GET("api/reports/branches")
+    Call<ApiResponse<List<com.mad.techfix.models.reports.BranchReport>>> getBranchPerformanceReport(
+            @Header("Authorization") String auth
+    );
 }

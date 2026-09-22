@@ -1138,6 +1138,10 @@ export default {
             }
         }
 
+        if (user.role === "TECHNICIAN" && apt.technician_id !== user.id) {
+            return json({ success: false, message: "Access denied: Can only update your assigned appointments" }, 403);
+        }
+
         await env.DB.prepare(
           `UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         )
@@ -3050,6 +3054,178 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
         }
     });
 }
+
+      // ==========================================
+      // REPORTS & MISSING APIS (Phase 1 Fixes)
+      // ==========================================
+      
+      // Cancel Appointment
+      if (path.startsWith("/api/appointments/") && path.endsWith("/cancel") && request.method === "PUT") {
+        const user = await authenticate(request, env);
+        if (!user) return json({ success: false, message: "Unauthorized" }, 401);
+        const aptId = path.split("/")[3];
+        
+        // Verify ownership for customer
+        if (user.role === "CUSTOMER") {
+          const apt = await env.DB.prepare(`SELECT id, status, customer_id FROM appointments WHERE id = ?`).bind(aptId).first();
+          if (!apt) return json({ success: false, message: "Appointment not found" }, 404);
+          if (apt.customer_id !== user.id) return json({ success: false, message: "Access denied" }, 403);
+          if (apt.status !== "REQUESTED") return json({ success: false, message: "Only REQUESTED appointments can be cancelled" }, 400);
+        }
+        
+        await env.DB.batch([
+            env.DB.prepare(`UPDATE appointments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(aptId),
+            env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, 'CANCELLED', 'Cancelled by user', user.id)
+        ]);
+        
+        return json({ success: true, message: "Appointment cancelled" });
+      }
+
+      // Stock Adjustment
+      if (path.startsWith("/api/spare-parts/") && path.endsWith("/adjust") && request.method === "POST") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const partId = path.split("/")[3];
+        const { quantity, reason, branch_id } = await request.json();
+        
+        if (user.role === "MANAGER" && user.managerBranchId !== branch_id) {
+            return json({ success: false, message: "Cannot adjust stock for a different branch" }, 403);
+        }
+
+        const stockExists = await env.DB.prepare(`SELECT * FROM branch_spare_parts WHERE branch_id = ? AND spare_part_id = ?`).bind(branch_id, partId).first();
+        if (!stockExists) {
+            await env.DB.batch([
+                env.DB.prepare(`INSERT INTO branch_spare_parts (branch_id, spare_part_id, quantity) VALUES (?, ?, ?)`).bind(branch_id, partId, quantity),
+                env.DB.prepare(`UPDATE spare_parts SET quantity = quantity + (?) WHERE id = ?`).bind(quantity, partId)
+            ]);
+        } else {
+            await env.DB.batch([
+                env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity + (?) WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, branch_id, partId),
+                env.DB.prepare(`UPDATE spare_parts SET quantity = quantity + (?) WHERE id = ?`).bind(quantity, partId)
+            ]);
+        }
+        return json({ success: true, message: "Stock adjusted" });
+      }
+
+      // Appointment Parts Usage
+      if (path.startsWith("/api/appointments/") && path.endsWith("/parts") && request.method === "POST") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER", "TECHNICIAN"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const aptId = path.split("/")[3];
+        const { spare_part_id, quantity, unit_price } = await request.json();
+        
+        const apt = await env.DB.prepare(`SELECT branch_id FROM appointments WHERE id = ?`).bind(aptId).first();
+        if (!apt) return json({ success: false, message: "Appointment not found" }, 404);
+
+        if (user.role === "TECHNICIAN") {
+            const assignment = await env.DB.prepare(`SELECT technician_id FROM appointments WHERE id = ?`).bind(aptId).first();
+            if (assignment?.technician_id !== user.id) return json({ success: false, message: "Can only add parts to your assigned repairs" }, 403);
+        }
+
+        await env.DB.batch([
+            env.DB.prepare(`INSERT INTO appointment_parts (id, appointment_id, spare_part_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, spare_part_id, quantity, unit_price),
+            env.DB.prepare(`UPDATE spare_parts SET quantity = quantity - ? WHERE id = ?`).bind(quantity, spare_part_id),
+            env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity - ? WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, apt.branch_id, spare_part_id)
+        ]);
+        
+        return json({ success: true, message: "Part allocated to appointment" });
+      }
+
+      if (path.startsWith("/api/appointments/") && path.endsWith("/parts") && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user) return json({ success: false, message: "Unauthorized" }, 401);
+        const aptId = path.split("/")[3];
+        const parts = await env.DB.prepare(`
+           SELECT ap.*, sp.name as part_name, sp.part_number
+           FROM appointment_parts ap 
+           JOIN spare_parts sp ON ap.spare_part_id = sp.id 
+           WHERE ap.appointment_id = ?
+        `).bind(aptId).all();
+        return json({ success: true, data: parts.results });
+      }
+
+      // Reports - Summary (Branch Aware)
+      if (path === "/api/reports/summary" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        
+        const isMgr = user.role === "MANAGER";
+        const branchId = user.managerBranchId;
+        
+        let qRev = `SELECT SUM(p.amount) as total FROM payments p`;
+        let qPaid = `SELECT COUNT(*) as count FROM payments p`;
+        let qPend = `SELECT COUNT(*) as count FROM payments p`;
+        let qParts = `SELECT SUM(ap.quantity) as count FROM appointment_parts ap`;
+        let qLowStock = `SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= minimum_stock AND quantity > 0`;
+        let qOutStock = `SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= 0`;
+
+        if (isMgr) {
+            qRev += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PAID'`;
+            qPaid += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PAID'`;
+            qPend += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PENDING'`;
+            qParts += ` JOIN appointments a ON ap.appointment_id = a.id WHERE a.branch_id = ?`;
+            qLowStock = `SELECT COUNT(*) as count FROM branch_spare_parts WHERE branch_id = ? AND quantity <= 5 AND quantity > 0`; // Simplified min stock for branch
+            qOutStock = `SELECT COUNT(*) as count FROM branch_spare_parts WHERE branch_id = ? AND quantity <= 0`;
+        } else {
+            qRev += ` WHERE p.payment_status = 'PAID'`;
+            qPaid += ` WHERE p.payment_status = 'PAID'`;
+            qPend += ` WHERE p.payment_status = 'PENDING'`;
+        }
+
+        const rev = isMgr ? await env.DB.prepare(qRev).bind(branchId).first() : await env.DB.prepare(qRev).first();
+        const paidCount = isMgr ? await env.DB.prepare(qPaid).bind(branchId).first() : await env.DB.prepare(qPaid).first();
+        const pendingCount = isMgr ? await env.DB.prepare(qPend).bind(branchId).first() : await env.DB.prepare(qPend).first();
+        const partsUsed = isMgr ? await env.DB.prepare(qParts).bind(branchId).first() : await env.DB.prepare(qParts).first();
+        const lowStock = isMgr ? await env.DB.prepare(qLowStock).bind(branchId).first() : await env.DB.prepare(qLowStock).first();
+        const outStock = isMgr ? await env.DB.prepare(qOutStock).bind(branchId).first() : await env.DB.prepare(qOutStock).first();
+        
+        return json({ success: true, data: {
+           total_revenue: rev?.total || 0,
+           paid_count: paidCount?.count || 0,
+           pending_count: pendingCount?.count || 0,
+           parts_used: partsUsed?.count || 0,
+           low_stock_count: lowStock?.count || 0,
+           out_of_stock_count: outStock?.count || 0
+        }});
+      }
+
+      // Reports - Revenue
+      if (path === "/api/reports/revenue" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        // Implement branch filtering logic here when UI needs it
+        return json({ success: true, message: "Not implemented in detailed view yet" });
+      }
+
+      // Reports - Payments
+      if (path === "/api/reports/payments" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        return json({ success: true, message: "Not implemented in detailed view yet" });
+      }
+
+      // Reports - Spare Parts
+      if (path === "/api/reports/spare-parts" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const parts = await env.DB.prepare(`SELECT * FROM spare_parts`).all();
+        return json({ success: true, data: parts.results });
+      }
+
+      // Reports - Branches
+      if (path === "/api/reports/branches" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        if (user.role === "MANAGER") return json({ success: false, message: "Managers cannot view all branches" }, 403);
+        
+        const branches = await env.DB.prepare(`
+           SELECT b.id, b.name, b.city, 
+           (SELECT COUNT(*) FROM appointments WHERE branch_id = b.id) as total_repairs,
+           (SELECT SUM(p.amount) FROM payments p JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = b.id AND p.payment_status = 'PAID') as total_revenue
+           FROM branches b
+        `).all();
+        return json({ success: true, data: branches.results });
+      }
 
       // 404 FALLBACK
       // ==========================================
