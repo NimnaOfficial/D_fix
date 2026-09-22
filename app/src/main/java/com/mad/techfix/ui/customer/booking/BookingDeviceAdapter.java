@@ -50,6 +50,31 @@ public class BookingDeviceAdapter
         return devices.get(selectedPosition);
     }
 
+    public void selectDeviceById(String deviceId) {
+        if (deviceId == null) {
+            return;
+        }
+
+        for (int i = 0; i < devices.size(); i++) {
+            Device d = devices.get(i);
+            if (deviceId.equals(d.getId())) {
+                int previousPosition = selectedPosition;
+                selectedPosition = i;
+
+                if (previousPosition != RecyclerView.NO_POSITION) {
+                    notifyItemChanged(previousPosition);
+                }
+
+                notifyItemChanged(selectedPosition);
+
+                if (listener != null) {
+                    listener.onDeviceSelected(d);
+                }
+                break;
+            }
+        }
+    }
+
     @NonNull
     @Override
     public DeviceViewHolder onCreateViewHolder(

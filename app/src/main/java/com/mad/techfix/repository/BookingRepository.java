@@ -134,6 +134,97 @@ public class BookingRepository {
 
 
     // ==========================================
+    // ADD CUSTOMER DEVICE
+    // ==========================================
+
+    public void addDevice(
+            String token,
+            Device device,
+            BookingCallback<Device> callback
+    ) {
+
+        if (token == null
+                || token.trim().isEmpty()) {
+
+            callback.onError(
+                    "Authentication token is missing"
+            );
+
+            return;
+        }
+
+        apiService
+                .addCustomerDevice(
+                        token,
+                        device
+                )
+                .enqueue(
+                        new Callback<
+                                ApiResponse<
+                                        Device
+                                        >
+                                >() {
+
+                            @Override
+                            public void onResponse(
+                                    Call<
+                                            ApiResponse<
+                                                    Device
+                                                    >
+                                            > call,
+
+                                    Response<
+                                            ApiResponse<
+                                                    Device
+                                                    >
+                                            > response
+                            ) {
+
+                                if (response.isSuccessful()
+                                        && response.body() != null
+                                        && response.body().isSuccess()) {
+
+                                    callback.onSuccess(
+                                            response.body()
+                                                    .getData()
+                                    );
+
+                                } else {
+
+                                    callback.onError(
+                                            getApiMessage(
+                                                    response,
+                                                    "Unable to add device"
+                                            )
+                                    );
+                                }
+                            }
+
+
+                            @Override
+                            public void onFailure(
+                                    Call<
+                                            ApiResponse<
+                                                    Device
+                                                    >
+                                            > call,
+
+                                    Throwable t
+                            ) {
+
+                                callback.onError(
+                                        getThrowableMessage(
+                                                t,
+                                                "Unable to add device"
+                                        )
+                                );
+                            }
+                        }
+                );
+    }
+
+
+    // ==========================================
     // LOAD SERVICES
     // ==========================================
 

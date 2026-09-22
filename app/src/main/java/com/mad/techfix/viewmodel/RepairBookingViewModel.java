@@ -203,6 +203,74 @@ public class RepairBookingViewModel
     }
 
 
+    public void reloadDevices() {
+        pendingRequests = 1;
+        isLoading.setValue(true);
+        loadDevices();
+    }
+
+
+    public void addDevice(
+            Device device,
+            BookingRepository.BookingCallback<Device> callback
+    ) {
+
+        String token =
+                sessionManager
+                        .getBearerToken();
+
+        if (token == null
+                || token.trim().isEmpty()) {
+
+            if (callback != null) {
+                callback.onError(
+                        "Please sign in again"
+                );
+            }
+
+            return;
+        }
+
+        repository
+                .addDevice(
+                        token,
+                        device,
+                        new BookingRepository
+                                .BookingCallback<
+                                Device
+                                >() {
+
+                            @Override
+                            public void onSuccess(
+                                    Device data
+                            ) {
+
+                                reloadDevices();
+
+                                if (callback != null) {
+                                    callback.onSuccess(
+                                            data
+                                    );
+                                }
+                            }
+
+
+                            @Override
+                            public void onError(
+                                    String message
+                            ) {
+
+                                if (callback != null) {
+                                    callback.onError(
+                                            message
+                                    );
+                                }
+                            }
+                        }
+                );
+    }
+
+
     // ==========================================
     // SERVICES
     // ==========================================

@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -18,16 +20,20 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
 import com.mad.techfix.R;
 import com.mad.techfix.models.Device;
 import com.mad.techfix.models.admin.Branch;
 import com.mad.techfix.models.admin.Service;
+import com.mad.techfix.repository.BookingRepository;
 import com.mad.techfix.viewmodel.RepairBookingViewModel;
 
 import java.util.Calendar;
 import java.util.Locale;
 
 public class RepairBookingFragment extends Fragment {
+
+    private String pendingSelectDeviceId;
 
     private RecyclerView recyclerDevices;
     private RecyclerView recyclerServices;
@@ -287,6 +293,13 @@ public class RepairBookingFragment extends Fragment {
                                     .setDevices(
                                             devices
                                     );
+
+                            if (pendingSelectDeviceId != null) {
+                                deviceAdapter.selectDeviceById(pendingSelectDeviceId);
+                                pendingSelectDeviceId = null;
+                            } else if (selectedDevice != null) {
+                                deviceAdapter.selectDeviceById(selectedDevice.getId());
+                            }
                         }
                 );
 
@@ -406,24 +419,126 @@ public class RepairBookingFragment extends Fragment {
         );
 
 
-        btnAddDevice.setOnClickListener(
-                v -> {
+        btnAddDevice.setOnClickListener(v -> showAddDeviceDialog());
+    }
 
-                    /*
-                     * Device creation belongs to
-                     * the customer device module.
-                     *
-                     * This button can be connected
-                     * when that screen is available.
-                     */
+
+    // ==========================================
+    // ADD NEW DEVICE DIALOG
+    // ==========================================
+
+    private void showAddDeviceDialog() {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        View view = getLayoutInflater().inflate(R.layout.dialog_device_form, null);
+        builder.setView(view);
+
+        AlertDialog dialog = builder.create();
+        dialog.setCancelable(false);
+
+        TextView tvTitle = view.findViewById(R.id.tvDialogTitle);
+        AutoCompleteTextView actCategory = view.findViewById(R.id.actCategory);
+        TextInputEditText etBrand = view.findViewById(R.id.etBrand);
+        TextInputEditText etModel = view.findViewById(R.id.etModel);
+        TextInputEditText etSerialNumber = view.findViewById(R.id.etSerialNumber);
+        MaterialButton btnSave = view.findViewById(R.id.btnSave);
+        MaterialButton btnCancel = view.findViewById(R.id.btnCancel);
+
+        tvTitle.setText("Add New Device");
+
+        String[] categories = {"Smartphone", "Laptop", "Tablet", "Desktop", "Smartwatch"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                categories
+        );
+        actCategory.setAdapter(adapter);
+        actCategory.setText("Smartphone", false);
+
+        btnCancel.setOnClickListener(v -> dialog.dismiss());
+
+        btnSave.setOnClickListener(v -> {
+            String brand = etBrand.getText() != null ? etBrand.getText().toString().trim() : "";
+            String model = etModel.getText() != null ? etModel.getText().toString().trim() : "";
+            String serial = etSerialNumber.getText() != null ? etSerialNumber.getText().toString().trim() : "";
+            String selectedCategory = actCategory.getText() != null ? actCategory.getText().toString().trim() : "";
+
+            if (brand.isEmpty()) {
+                etBrand.setError("Brand is required");
+                etBrand.requestFocus();
+                return;
+            }
+
+            if (model.isEmpty()) {
+                etModel.setError("Model is required");
+                etModel.requestFocus();
+                return;
+            }
+
+            btnSave.setEnabled(false);
+            btnCancel.setEnabled(false);
+            btnSave.setText("Saving...");
+
+            Device device = new Device();
+            device.setBrand(brand);
+            device.setModel(model);
+            if (!serial.isEmpty()) {
+                device.setSerialNumber(serial);
+            }
+            device.setCategoryId(mapCategoryToId(selectedCategory));
+
+            viewModel.addDevice(device, new BookingRepository.BookingCallback<Device>() {
+                @Override
+                public void onSuccess(Device createdDevice) {
+                    Toast.makeText(
+                            requireContext(),
+                            "Device added successfully",
+                            Toast.LENGTH_SHORT
+                    ).show();
+
+                    if (createdDevice != null && createdDevice.getId() != null) {
+                        pendingSelectDeviceId = createdDevice.getId();
+                    }
+
+                    dialog.dismiss();
+                }
+
+                @Override
+                public void onError(String message) {
+                    btnSave.setEnabled(true);
+                    btnCancel.setEnabled(true);
+                    btnSave.setText("Save");
 
                     Toast.makeText(
                             requireContext(),
-                            "Add Device screen will open here",
-                            Toast.LENGTH_SHORT
+                            message != null ? message : "Failed to add device",
+                            Toast.LENGTH_LONG
                     ).show();
                 }
-        );
+            });
+        });
+
+        dialog.show();
+    }
+
+    private String mapCategoryToId(String categoryName) {
+        if (categoryName == null) return "CAT-003";
+        switch (categoryName.trim().toLowerCase(Locale.ROOT)) {
+            case "laptop":
+                return "CAT-001";
+            case "desktop":
+            case "desktop pc":
+                return "CAT-002";
+            case "smartphone":
+            case "mobile phone":
+            case "mobile":
+                return "CAT-003";
+            case "tablet":
+                return "CAT-004";
+            case "smartwatch":
+                return "CAT-005";
+            default:
+                return "CAT-003";
+        }
     }
 
 
