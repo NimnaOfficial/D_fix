@@ -289,7 +289,7 @@ export default {
       // ==========================================
       if (path === "/api/auth/register" && request.method === "POST") {
         const body = await request.json();
-        const { first_name, last_name, email, phone, password, city } = body;
+        const { first_name, last_name, email, phone, password, city, address } = body;
 
         if (!first_name || !last_name || !email || !phone || !password) {
           return json(
@@ -346,22 +346,16 @@ export default {
         const storedPasswordHash = `${salt}:${passwordHash}`;
         const userId = crypto.randomUUID();
 
-        // Customer registration strictly creates CUSTOMER accounts
-        await env.DB.prepare(
-          `
-            INSERT INTO users (id, first_name, last_name, email, phone, password_hash, role, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, 'CUSTOMER', 1)
-        `,
-        )
-          .bind(
-            userId,
-            first_name.trim(),
-            last_name.trim(),
-            normalizedEmail,
-            phone.trim(),
-            storedPasswordHash,
-          )
-          .run();
+        // Use batch for transactional safety
+        await env.DB.batch([
+            env.DB.prepare(
+              `INSERT INTO users (id, first_name, last_name, email, phone, password_hash, role, is_active) VALUES (?, ?, ?, ?, ?, ?, 'CUSTOMER', 1)`
+            ).bind(userId, first_name.trim(), last_name.trim(), normalizedEmail, phone.trim(), storedPasswordHash),
+            
+            env.DB.prepare(
+              `INSERT INTO customers (user_id, city, address) VALUES (?, ?, ?)`
+            ).bind(userId, city?.trim() || null, address?.trim() || null)
+        ]);
 
         return json(
           {
@@ -375,7 +369,8 @@ export default {
               phone: phone.trim(),
               role: "CUSTOMER",
               city: city || null,
-            },
+              address: address || null
+            }
           },
           201,
         );
