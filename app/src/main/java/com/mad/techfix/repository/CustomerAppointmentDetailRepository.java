@@ -12,6 +12,8 @@ import com.mad.techfix.models.AppointmentDetail;
 import com.mad.techfix.network.ApiService;
 import com.mad.techfix.network.RetrofitClient;
 
+import androidx.annotation.NonNull;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -153,6 +155,48 @@ public class CustomerAppointmentDetailRepository {
                             }
                         }
                 );
+    }
+
+    public interface CancelCallback {
+        void onSuccess();
+        void onError(String message);
+    }
+
+    public void cancelAppointment(
+            String token,
+            String appointmentId,
+            CancelCallback callback
+    ) {
+        apiService
+                .cancelAppointment(
+                        "Bearer " + token,
+                        appointmentId
+                )
+                .enqueue(new retrofit2.Callback<com.mad.techfix.models.ApiResponse<Object>>() {
+                    @Override
+                    public void onResponse(
+                            @NonNull retrofit2.Call<com.mad.techfix.models.ApiResponse<Object>> call,
+                            @NonNull retrofit2.Response<com.mad.techfix.models.ApiResponse<Object>> response
+                    ) {
+                        if (response.isSuccessful() && response.body() != null) {
+                            if (response.body().isSuccess()) {
+                                callback.onSuccess();
+                            } else {
+                                callback.onError(response.body().getMessage());
+                            }
+                        } else {
+                            callback.onError("Failed to cancel appointment");
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(
+                            @NonNull retrofit2.Call<com.mad.techfix.models.ApiResponse<Object>> call,
+                            @NonNull Throwable t
+                    ) {
+                        callback.onError("Network error: " + t.getMessage());
+                    }
+                });
     }
 
 

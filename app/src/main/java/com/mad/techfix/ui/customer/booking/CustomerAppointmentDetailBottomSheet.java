@@ -5,11 +5,13 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
@@ -616,19 +618,20 @@ public class CustomerAppointmentDetailBottomSheet
 
     private void showCancellationMessage() {
 
-        /*
-         * Customer cancellation endpoint is not
-         * available in the current backend.
-         *
-         * Keep the required cancellation UI
-         * without faking a successful cancellation.
-         */
+        if (appointmentId == null || appointmentId.trim().isEmpty()) {
+            return;
+        }
 
-        Toast.makeText(
-                requireContext(),
-                "Appointment cancellation is not available from the server yet.",
-                Toast.LENGTH_LONG
-        ).show();
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Cancel Appointment")
+                .setMessage("Are you sure you want to cancel this appointment?")
+                .setPositiveButton("Yes, Cancel", (dialog, which) -> {
+                    btnCancelAppointment.setEnabled(false);
+                    btnCancelAppointment.setText("Cancelling...");
+                    viewModel.cancelAppointment(appointmentId);
+                })
+                .setNegativeButton("No", null)
+                .show();
     }
 
 

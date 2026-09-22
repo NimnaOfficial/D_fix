@@ -152,6 +152,39 @@ public class CustomerAppointmentDetailViewModel
 
 
     // ==========================================
+    // CANCEL APPOINTMENT
+    // ==========================================
+
+    public void cancelAppointment(String appointmentId) {
+        String token = sessionManager.getAuthToken();
+        if (token == null) {
+            errorMessage.setValue("Not authenticated");
+            return;
+        }
+
+        isLoading.setValue(true);
+
+        repository.cancelAppointment(
+                token,
+                appointmentId,
+                new CustomerAppointmentDetailRepository.CancelCallback() {
+                    @Override
+                    public void onSuccess() {
+                        isLoading.setValue(false);
+                        // Reload the details to reflect cancelled status
+                        loadAppointmentDetail(appointmentId);
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        isLoading.setValue(false);
+                        errorMessage.setValue(message);
+                    }
+                }
+        );
+    }
+
+    // ==========================================
     // RESET
     // ==========================================
 

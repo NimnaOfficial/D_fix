@@ -3051,6 +3051,144 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
     });
 }
 
+      // ==========================================
+      // REPORTS & MISSING APIS (Phase 1 Fixes)
+      // ==========================================
+      
+      // Cancel Appointment
+      if (path.startsWith("/api/appointments/") && path.endsWith("/cancel") && request.method === "PUT") {
+        const user = await authenticate(request, env);
+        if (!user) return json({ success: false, message: "Unauthorized" }, 401);
+        const aptId = path.split("/")[3];
+        
+        // Verify ownership for customer
+        if (user.role === "CUSTOMER") {
+          const apt = await env.DB.prepare(`SELECT id, status, customer_id FROM appointments WHERE id = ?`).bind(aptId).first();
+          if (!apt) return json({ success: false, message: "Appointment not found" }, 404);
+          if (apt.customer_id !== user.id) return json({ success: false, message: "Access denied" }, 403);
+          if (apt.status !== "REQUESTED") return json({ success: false, message: "Only REQUESTED appointments can be cancelled" }, 400);
+        }
+        
+        await env.DB.prepare(`UPDATE appointments SET status = 'CANCELLED' WHERE id = ?`).bind(aptId).run();
+        await env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, 'CANCELLED', 'Cancelled by user', user.id).run();
+        
+        return json({ success: true, message: "Appointment cancelled" });
+      }
+
+      // Stock Adjustment
+      if (path.startsWith("/api/spare-parts/") && path.endsWith("/adjust") && request.method === "POST") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const partId = path.split("/")[3];
+        const { quantity, reason, branch_id } = await request.json();
+        
+        // Ensure branch stock row exists
+        const stockExists = await env.DB.prepare(`SELECT * FROM branch_spare_parts WHERE branch_id = ? AND spare_part_id = ?`).bind(branch_id, partId).first();
+        if (!stockExists) {
+            await env.DB.prepare(`INSERT INTO branch_spare_parts (branch_id, spare_part_id, quantity) VALUES (?, ?, ?)`).bind(branch_id, partId, quantity).run();
+        } else {
+            await env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity + (?) WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, branch_id, partId).run();
+        }
+        // Also update total quantity in spare_parts table
+        await env.DB.prepare(`UPDATE spare_parts SET quantity = quantity + (?) WHERE id = ?`).bind(quantity, partId).run();
+        return json({ success: true, message: "Stock adjusted" });
+      }
+
+      // Appointment Parts Usage
+      if (path.startsWith("/api/appointments/") && path.endsWith("/parts") && request.method === "POST") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER", "TECHNICIAN"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const aptId = path.split("/")[3];
+        const { spare_part_id, quantity, unit_price } = await request.json();
+        
+        await env.DB.prepare(`INSERT INTO appointment_parts (id, appointment_id, spare_part_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, spare_part_id, quantity, unit_price).run();
+        // Decrease total stock
+        await env.DB.prepare(`UPDATE spare_parts SET quantity = quantity - ? WHERE id = ?`).bind(quantity, spare_part_id).run();
+        
+        // Find branch of appointment to decrease branch stock
+        const apt = await env.DB.prepare(`SELECT branch_id FROM appointments WHERE id = ?`).bind(aptId).first();
+        if (apt) {
+           await env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity - ? WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, apt.branch_id, spare_part_id).run();
+        }
+        
+        return json({ success: true, message: "Part allocated to appointment" });
+      }
+
+      if (path.startsWith("/api/appointments/") && path.endsWith("/parts") && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user) return json({ success: false, message: "Unauthorized" }, 401);
+        const aptId = path.split("/")[3];
+        const parts = await env.DB.prepare(`
+           SELECT ap.*, sp.name as part_name, sp.part_number
+           FROM appointment_parts ap 
+           JOIN spare_parts sp ON ap.spare_part_id = sp.id 
+           WHERE ap.appointment_id = ?
+        `).bind(aptId).all();
+        return json({ success: true, data: parts.results });
+      }
+
+      // Reports - Summary
+      if (path === "/api/reports/summary" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        
+        const rev = await env.DB.prepare(`SELECT SUM(amount) as total FROM payments WHERE payment_status = 'PAID'`).first();
+        const paidCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM payments WHERE payment_status = 'PAID'`).first();
+        const pendingCount = await env.DB.prepare(`SELECT COUNT(*) as count FROM payments WHERE payment_status = 'PENDING'`).first();
+        const partsUsed = await env.DB.prepare(`SELECT SUM(quantity) as count FROM appointment_parts`).first();
+        const lowStock = await env.DB.prepare(`SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= minimum_stock AND quantity > 0`).first();
+        const outStock = await env.DB.prepare(`SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= 0`).first();
+        
+        return json({ success: true, data: {
+           total_revenue: rev?.total || 0,
+           paid_count: paidCount?.count || 0,
+           pending_count: pendingCount?.count || 0,
+           parts_used: partsUsed?.count || 0,
+           low_stock_count: lowStock?.count || 0,
+           out_of_stock_count: outStock?.count || 0
+        }});
+      }
+
+      // Reports - Revenue
+      if (path === "/api/reports/revenue" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        // Simplified for now: just return all paid
+        const rev = await env.DB.prepare(`SELECT * FROM payments WHERE payment_status = 'PAID' ORDER BY created_at DESC`).all();
+        const total = await env.DB.prepare(`SELECT SUM(amount) as sum FROM payments WHERE payment_status = 'PAID'`).first();
+        const pending = await env.DB.prepare(`SELECT SUM(amount) as sum FROM payments WHERE payment_status = 'PENDING'`).first();
+        return json({ success: true, data: { transactions: rev.results, total_revenue: total?.sum || 0, pending_revenue: pending?.sum || 0 }});
+      }
+
+      // Reports - Payments
+      if (path === "/api/reports/payments" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const breakdown = await env.DB.prepare(`SELECT payment_status, COUNT(*) as count, SUM(amount) as total FROM payments GROUP BY payment_status`).all();
+        return json({ success: true, data: breakdown.results });
+      }
+
+      // Reports - Spare Parts
+      if (path === "/api/reports/spare-parts" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const parts = await env.DB.prepare(`SELECT * FROM spare_parts`).all();
+        return json({ success: true, data: parts.results });
+      }
+
+      // Reports - Branches
+      if (path === "/api/reports/branches" && request.method === "GET") {
+        const user = await authenticate(request, env);
+        if (!user || !["ADMIN", "MANAGER"].includes(user.role)) return json({ success: false, message: "Access denied" }, 403);
+        const branches = await env.DB.prepare(`
+           SELECT b.id, b.name, b.city, 
+           (SELECT COUNT(*) FROM appointments WHERE branch_id = b.id) as total_repairs,
+           (SELECT SUM(p.amount) FROM payments p JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = b.id AND p.payment_status = 'PAID') as total_revenue
+           FROM branches b
+        `).all();
+        return json({ success: true, data: branches.results });
+      }
+
       // 404 FALLBACK
       // ==========================================
       return json({ success: false, message: "Endpoint not found" }, 404);
