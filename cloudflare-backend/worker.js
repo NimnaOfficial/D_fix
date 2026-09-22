@@ -390,7 +390,7 @@ export default {
           );
 
         const user = await env.DB.prepare(
-          `SELECT * FROM users WHERE email = ? LIMIT 1`,
+          `SELECT u.*, c.city, c.address, c.loyalty_points FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE u.email = ? LIMIT 1`,
         )
           .bind(email.trim().toLowerCase())
           .first();
@@ -457,17 +457,26 @@ export default {
             phone: user.phone,
             role: user.role,
             profile_image_url: user.profile_image_url,
+            city: user.city,
+            address: user.address,
+            loyalty_points: user.loyalty_points
           },
         });
       }
 
-      if (path === "/api/me" && request.method === "GET") {
-        const user = await authenticate(request, env);
+      if (path === "/api/auth/me" && request.method === "GET") {
+        const userReq = await authenticate(request, env);
+        if (!userReq)
+          return json({ success: false, message: "Unauthorized" }, 401);
+
+        const user = await env.DB.prepare(
+          `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.profile_image_url, c.city, c.address, c.loyalty_points FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE u.id = ? LIMIT 1`,
+        )
+          .bind(userReq.id)
+          .first();
         if (!user)
-          return json(
-            { success: false, message: "Invalid or expired authentication" },
-            401,
-          );
+          return json({ success: false, message: "User not found" }, 404);
+
         return json({ success: true, user });
       }
 
@@ -476,17 +485,27 @@ export default {
         if (!user)
           return json({ success: false, message: "Unauthorized" }, 401);
 
-        const { first_name, last_name, phone } = await request.json();
+        const { first_name, last_name, phone, city } = await request.json();
         if (!first_name || !last_name || !phone)
-          return json({ success: false, message: "All fields required" }, 400);
+          return json({ success: false, message: "First name, last name, and phone are required" }, 400);
 
         await env.DB.prepare(
           `UPDATE users SET first_name = ?, last_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
         )
           .bind(first_name.trim(), last_name.trim(), phone.trim(), user.id)
           .run();
+          
+        if (user.role === 'CUSTOMER') {
+            const customerExists = await env.DB.prepare(`SELECT user_id FROM customers WHERE user_id = ?`).bind(user.id).first();
+            if (!customerExists) {
+                await env.DB.prepare(`INSERT INTO customers (user_id, city) VALUES (?, ?)`).bind(user.id, city?.trim() || null).run();
+            } else {
+                await env.DB.prepare(`UPDATE customers SET city = ? WHERE user_id = ?`).bind(city?.trim() || null, user.id).run();
+            }
+        }
+        
         const updatedUser = await env.DB.prepare(
-          `SELECT id, first_name, last_name, email, phone, role, profile_image_url FROM users WHERE id = ? LIMIT 1`,
+          `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.profile_image_url, c.city, c.address FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE u.id = ? LIMIT 1`,
         )
           .bind(user.id)
           .first();
