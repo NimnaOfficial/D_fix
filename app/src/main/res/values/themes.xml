@@ -6,7 +6,7 @@
         <item name="android:windowBackground">@color/app_background</item>
         <item name="android:navigationBarColor">@color/app_background</item>
         <item name="android:windowLightStatusBar" tools:targetApi="M">true</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="O">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="O_MR1">true</item>
 
         <!-- Material 3 Overrides -->
         <item name="colorSurface">@color/app_surface</item>
