@@ -52,7 +52,7 @@ public interface ApiService {
             @Body RegisterRequest registerRequest
     );
 
-    @GET("api/me")
+    @GET("api/auth/me")
     Call<AuthResponse> getMe(
             @Header("Authorization") String auth
     );

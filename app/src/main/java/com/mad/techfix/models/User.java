@@ -9,6 +9,7 @@ public class User {
     private String role;
     private String profile_image_url;
     private String city;
+    private String address;
     private int is_active;
 
     // Getters and Setters
@@ -32,6 +33,9 @@ public class User {
 
     public String getCity() { return city; }
     public void setCity(String city) { this.city = city; }
+    
+    public String getAddress() { return address; }
+    public void setAddress(String address) { this.address = address; }
 
     public String getProfile_image_url() { return profile_image_url; }
     public void setProfile_image_url(String profile_image_url) { this.profile_image_url = profile_image_url; }

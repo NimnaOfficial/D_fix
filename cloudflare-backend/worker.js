@@ -480,7 +480,7 @@ export default {
         if (!user)
           return json({ success: false, message: "Unauthorized" }, 401);
 
-        const { first_name, last_name, phone, city } = await request.json();
+        const { first_name, last_name, phone, city, address } = await request.json();
         if (!first_name || !last_name || !phone)
           return json({ success: false, message: "First name, last name, and phone are required" }, 400);
 
@@ -493,9 +493,9 @@ export default {
         if (user.role === 'CUSTOMER') {
             const customerExists = await env.DB.prepare(`SELECT user_id FROM customers WHERE user_id = ?`).bind(user.id).first();
             if (!customerExists) {
-                await env.DB.prepare(`INSERT INTO customers (user_id, city) VALUES (?, ?)`).bind(user.id, city?.trim() || null).run();
+                await env.DB.prepare(`INSERT INTO customers (user_id, city, address) VALUES (?, ?, ?)`).bind(user.id, city?.trim() || null, address?.trim() || null).run();
             } else {
-                await env.DB.prepare(`UPDATE customers SET city = ? WHERE user_id = ?`).bind(city?.trim() || null, user.id).run();
+                await env.DB.prepare(`UPDATE customers SET city = ?, address = ? WHERE user_id = ?`).bind(city?.trim() || null, address?.trim() || null, user.id).run();
             }
         }
         
@@ -3106,17 +3106,11 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
             return json({ success: false, message: "Cannot adjust stock for a different branch" }, 403);
         }
 
-        const stockExists = await env.DB.prepare(`SELECT * FROM branch_spare_parts WHERE branch_id = ? AND spare_part_id = ?`).bind(branch_id, partId).first();
+        const stockExists = await env.DB.prepare(`SELECT * FROM branch_spare_parts WHERE branch_id = ? AND part_id = ?`).bind(branch_id, partId).first();
         if (!stockExists) {
-            await env.DB.batch([
-                env.DB.prepare(`INSERT INTO branch_spare_parts (branch_id, spare_part_id, quantity) VALUES (?, ?, ?)`).bind(branch_id, partId, quantity),
-                env.DB.prepare(`UPDATE spare_parts SET quantity = quantity + (?) WHERE id = ?`).bind(quantity, partId)
-            ]);
+            await env.DB.prepare(`INSERT INTO branch_spare_parts (branch_id, part_id, quantity) VALUES (?, ?, ?)`).bind(branch_id, partId, quantity).run();
         } else {
-            await env.DB.batch([
-                env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity + (?) WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, branch_id, partId),
-                env.DB.prepare(`UPDATE spare_parts SET quantity = quantity + (?) WHERE id = ?`).bind(quantity, partId)
-            ]);
+            await env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity + (?) WHERE branch_id = ? AND part_id = ?`).bind(quantity, branch_id, partId).run();
         }
         return json({ success: true, message: "Stock adjusted" });
       }
@@ -3136,10 +3130,11 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
             if (assignment?.technician_id !== user.id) return json({ success: false, message: "Can only add parts to your assigned repairs" }, 403);
         }
 
+        const totalPrice = quantity * unit_price;
+
         await env.DB.batch([
-            env.DB.prepare(`INSERT INTO appointment_parts (id, appointment_id, spare_part_id, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, spare_part_id, quantity, unit_price),
-            env.DB.prepare(`UPDATE spare_parts SET quantity = quantity - ? WHERE id = ?`).bind(quantity, spare_part_id),
-            env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity - ? WHERE branch_id = ? AND spare_part_id = ?`).bind(quantity, apt.branch_id, spare_part_id)
+            env.DB.prepare(`INSERT INTO appointment_parts (id, appointment_id, part_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, spare_part_id, quantity, unit_price, totalPrice),
+            env.DB.prepare(`UPDATE branch_spare_parts SET quantity = quantity - ? WHERE branch_id = ? AND part_id = ?`).bind(quantity, apt.branch_id, spare_part_id)
         ]);
         
         return json({ success: true, message: "Part allocated to appointment" });
@@ -3152,7 +3147,7 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
         const parts = await env.DB.prepare(`
            SELECT ap.*, sp.name as part_name, sp.part_number
            FROM appointment_parts ap 
-           JOIN spare_parts sp ON ap.spare_part_id = sp.id 
+           JOIN spare_parts sp ON ap.part_id = sp.id 
            WHERE ap.appointment_id = ?
         `).bind(aptId).all();
         return json({ success: true, data: parts.results });
@@ -3170,15 +3165,15 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
         let qPaid = `SELECT COUNT(*) as count FROM payments p`;
         let qPend = `SELECT COUNT(*) as count FROM payments p`;
         let qParts = `SELECT SUM(ap.quantity) as count FROM appointment_parts ap`;
-        let qLowStock = `SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= minimum_stock AND quantity > 0`;
-        let qOutStock = `SELECT COUNT(*) as count FROM spare_parts WHERE quantity <= 0`;
+        let qLowStock = `SELECT COUNT(*) as count FROM branch_spare_parts bsp JOIN spare_parts sp ON bsp.part_id = sp.id WHERE bsp.quantity <= sp.minimum_stock AND bsp.quantity > 0`;
+        let qOutStock = `SELECT COUNT(*) as count FROM branch_spare_parts WHERE quantity <= 0`;
 
         if (isMgr) {
             qRev += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PAID'`;
             qPaid += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PAID'`;
             qPend += ` JOIN appointments a ON p.appointment_id = a.id WHERE a.branch_id = ? AND p.payment_status = 'PENDING'`;
             qParts += ` JOIN appointments a ON ap.appointment_id = a.id WHERE a.branch_id = ?`;
-            qLowStock = `SELECT COUNT(*) as count FROM branch_spare_parts WHERE branch_id = ? AND quantity <= 5 AND quantity > 0`; // Simplified min stock for branch
+            qLowStock = `SELECT COUNT(*) as count FROM branch_spare_parts bsp JOIN spare_parts sp ON bsp.part_id = sp.id WHERE bsp.branch_id = ? AND bsp.quantity <= sp.minimum_stock AND bsp.quantity > 0`;
             qOutStock = `SELECT COUNT(*) as count FROM branch_spare_parts WHERE branch_id = ? AND quantity <= 0`;
         } else {
             qRev += ` WHERE p.payment_status = 'PAID'`;

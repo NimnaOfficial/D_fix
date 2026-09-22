@@ -28,7 +28,7 @@ import retrofit2.Response;
 
 public class CustomerProfileFragment extends Fragment {
 
-    private TextInputEditText etFirstName, etLastName, etEmail, etPhone, etCity;
+    private TextInputEditText etFirstName, etLastName, etEmail, etPhone, etCity, etAddress;
     private TextInputEditText etCurrentPassword, etNewPassword;
     private MaterialButton btnUpdateProfile, btnChangePassword, btnLogout;
     private TextView tvUserEmail;
@@ -46,6 +46,7 @@ public class CustomerProfileFragment extends Fragment {
         etEmail = view.findViewById(R.id.etEmail);
         etPhone = view.findViewById(R.id.etPhone);
         etCity = view.findViewById(R.id.etCity);
+        etAddress = view.findViewById(R.id.etAddress);
         
         etCurrentPassword = view.findViewById(R.id.etCurrentPassword);
         etNewPassword = view.findViewById(R.id.etNewPassword);
@@ -57,7 +58,15 @@ public class CustomerProfileFragment extends Fragment {
         btnLogout = view.findViewById(R.id.btnLogout);
 
         // Pre-fill fields initially from local session
-        etFirstName.setText(sessionManager.getUserName());
+        String fullName = sessionManager.getUserName();
+        if (fullName != null) {
+            String[] parts = fullName.split(" ");
+            etFirstName.setText(parts[0]);
+            if (parts.length > 1) {
+                etLastName.setText(fullName.substring(parts[0].length()).trim());
+            }
+        }
+        
         etPhone.setText(sessionManager.getUserPhone());
         etEmail.setText(sessionManager.getUserEmail());
         tvUserEmail.setText(sessionManager.getUserEmail());
@@ -90,15 +99,24 @@ public class CustomerProfileFragment extends Fragment {
                     etPhone.setText(user.getPhone());
                     etEmail.setText(user.getEmail());
                     tvUserEmail.setText(user.getEmail());
+                    
                     if(user.getCity() != null) {
                         etCity.setText(user.getCity());
                     }
+                    if(user.getAddress() != null) {
+                        etAddress.setText(user.getAddress());
+                    }
+                    
+                    // Update cache
+                    sessionManager.saveAuthSession(sessionManager.getAuthToken(), user);
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<AuthResponse> call, @NonNull Throwable t) {
-                Toast.makeText(getContext(), "Failed to load latest profile", Toast.LENGTH_SHORT).show();
+                if (getContext() != null) {
+                    Toast.makeText(getContext(), "Failed to load profile", Toast.LENGTH_SHORT).show();
+                }
             }
         });
     }
@@ -108,9 +126,10 @@ public class CustomerProfileFragment extends Fragment {
         String lastName = etLastName.getText() != null ? etLastName.getText().toString().trim() : "";
         String phone = etPhone.getText() != null ? etPhone.getText().toString().trim() : "";
         String city = etCity.getText() != null ? etCity.getText().toString().trim() : "";
+        String address = etAddress.getText() != null ? etAddress.getText().toString().trim() : "";
 
         if (TextUtils.isEmpty(firstName) || TextUtils.isEmpty(lastName) || TextUtils.isEmpty(phone)) {
-            Toast.makeText(getContext(), "Name and phone are required", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "First Name, Last Name, and Phone are required", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -119,23 +138,20 @@ public class CustomerProfileFragment extends Fragment {
         profileData.put("last_name", lastName);
         profileData.put("phone", phone);
         profileData.put("city", city);
+        profileData.put("address", address);
 
         String token = sessionManager.getBearerToken();
+        btnUpdateProfile.setEnabled(false);
+
         RetrofitClient.getApiService().updateProfile(token, profileData).enqueue(new Callback<ApiResponse<Object>>() {
             @Override
             public void onResponse(@NonNull Call<ApiResponse<Object>> call, @NonNull Response<ApiResponse<Object>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
+                btnUpdateProfile.setEnabled(true);
+                if (response.isSuccessful() && response.body() != null) {
                     Toast.makeText(getContext(), "Profile updated successfully!", Toast.LENGTH_SHORT).show();
-                    // Update session manager too
-                    User updatedUser = new User();
-                    updatedUser.setId(sessionManager.getUserId());
-                    updatedUser.setFirst_name(firstName);
-                    updatedUser.setLast_name(lastName);
-                    updatedUser.setEmail(sessionManager.getUserEmail());
-                    updatedUser.setPhone(phone);
-                    updatedUser.setRole("CUSTOMER");
-                    updatedUser.setCity(city);
-                    sessionManager.saveAuthSession(sessionManager.getAuthToken(), updatedUser);
+                    
+                    // Reload profile data to refresh UI and update session manager
+                    loadProfileData();
                 } else {
                     Toast.makeText(getContext(), "Failed to update profile", Toast.LENGTH_SHORT).show();
                 }
@@ -143,17 +159,18 @@ public class CustomerProfileFragment extends Fragment {
 
             @Override
             public void onFailure(@NonNull Call<ApiResponse<Object>> call, @NonNull Throwable t) {
-                Toast.makeText(getContext(), "Network Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                btnUpdateProfile.setEnabled(true);
+                Toast.makeText(getContext(), "Network error", Toast.LENGTH_SHORT).show();
             }
         });
     }
-    
+
     private void updatePassword() {
         String currentPassword = etCurrentPassword.getText() != null ? etCurrentPassword.getText().toString() : "";
         String newPassword = etNewPassword.getText() != null ? etNewPassword.getText().toString() : "";
 
         if (TextUtils.isEmpty(currentPassword) || TextUtils.isEmpty(newPassword)) {
-            Toast.makeText(getContext(), "Both password fields are required", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "Please enter both current and new passwords", Toast.LENGTH_SHORT).show();
             return;
         }
         
@@ -162,26 +179,30 @@ public class CustomerProfileFragment extends Fragment {
             return;
         }
 
-        Map<String, String> passwordData = new HashMap<>();
-        passwordData.put("current_password", currentPassword);
-        passwordData.put("new_password", newPassword);
+        Map<String, String> passData = new HashMap<>();
+        passData.put("current_password", currentPassword);
+        passData.put("new_password", newPassword);
 
         String token = sessionManager.getBearerToken();
-        RetrofitClient.getApiService().updatePassword(token, passwordData).enqueue(new Callback<ApiResponse<Object>>() {
+        btnChangePassword.setEnabled(false);
+
+        RetrofitClient.getApiService().updatePassword(token, passData).enqueue(new Callback<ApiResponse<Object>>() {
             @Override
             public void onResponse(@NonNull Call<ApiResponse<Object>> call, @NonNull Response<ApiResponse<Object>> response) {
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(getContext(), "Password updated successfully!", Toast.LENGTH_SHORT).show();
+                btnChangePassword.setEnabled(true);
+                if (response.isSuccessful()) {
+                    Toast.makeText(getContext(), "Password changed successfully!", Toast.LENGTH_SHORT).show();
                     etCurrentPassword.setText("");
                     etNewPassword.setText("");
                 } else {
-                    Toast.makeText(getContext(), "Failed to update password. Check your current password.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Failed to change password. Check your current password.", Toast.LENGTH_LONG).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<ApiResponse<Object>> call, @NonNull Throwable t) {
-                Toast.makeText(getContext(), "Network Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                btnChangePassword.setEnabled(true);
+                Toast.makeText(getContext(), "Network error", Toast.LENGTH_SHORT).show();
             }
         });
     }
