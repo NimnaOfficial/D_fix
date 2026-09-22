@@ -106,7 +106,25 @@ public class CustomerDevicesFragment extends Fragment {
 
         // Dummy categories for now, ideally fetched from API
         String[] categories = {"Laptop", "Smartphone", "Tablet", "Desktop", "Smartwatch"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, categories);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(requireContext(), android.R.layout.simple_dropdown_item_1line, categories) {
+            @NonNull
+            @Override
+            public android.widget.Filter getFilter() {
+                return new android.widget.Filter() {
+                    @Override
+                    protected FilterResults performFiltering(CharSequence constraint) {
+                        FilterResults results = new FilterResults();
+                        results.values = categories;
+                        results.count = categories.length;
+                        return results;
+                    }
+                    @Override
+                    protected void publishResults(CharSequence constraint, FilterResults results) {
+                        notifyDataSetChanged();
+                    }
+                };
+            }
+        };
         actCategory.setAdapter(adapter);
 
         if (existingDevice != null) {

@@ -36,8 +36,8 @@ public class RepairBookingFragment extends Fragment {
     private String pendingSelectDeviceId;
 
     private RecyclerView recyclerDevices;
-    private RecyclerView recyclerServices;
-    private RecyclerView recyclerBranches;
+    private AutoCompleteTextView actBookingService;
+    private AutoCompleteTextView actBookingBranch;
 
     private TextView tvSelectedDevice;
     private TextView tvSelectedService;
@@ -47,8 +47,6 @@ public class RepairBookingFragment extends Fragment {
     private MaterialButton btnContinue;
 
     private BookingDeviceAdapter deviceAdapter;
-    private BookingServiceAdapter serviceAdapter;
-    private BookingBranchAdapter branchAdapter;
 
     private RepairBookingViewModel viewModel;
 
@@ -119,14 +117,14 @@ public class RepairBookingFragment extends Fragment {
                         R.id.recycler_booking_devices
                 );
 
-        recyclerServices =
+        actBookingService =
                 view.findViewById(
-                        R.id.recycler_booking_services
+                        R.id.act_booking_service
                 );
 
-        recyclerBranches =
+        actBookingBranch =
                 view.findViewById(
-                        R.id.recycler_booking_branches
+                        R.id.act_booking_branch
                 );
 
         tvSelectedDevice =
@@ -186,83 +184,14 @@ public class RepairBookingFragment extends Fragment {
                 );
 
 
-        serviceAdapter =
-                new BookingServiceAdapter(
-                        service -> {
-
-                            selectedService =
-                                    service;
-
-                            String name =
-                                    service.getName();
-
-                            if (name == null
-                                    || name.trim().isEmpty()) {
-
-                                name =
-                                        "Selected service";
-                            }
-
-                            tvSelectedService.setText(
-                                    "Service: " + name
-                            );
-                        }
-                );
-
-
-        branchAdapter =
-                new BookingBranchAdapter(
-                        branch -> {
-
-                            selectedBranch =
-                                    branch;
-
-                            String name =
-                                    branch.getName();
-
-                            if (name == null
-                                    || name.trim().isEmpty()) {
-
-                                name =
-                                        "Selected branch";
-                            }
-
-                            tvSelectedBranch.setText(
-                                    "Branch: " + name
-                            );
-                        }
-                );
-
-
         recyclerDevices.setLayoutManager(
                 new LinearLayoutManager(
                         requireContext()
                 )
         );
 
-        recyclerServices.setLayoutManager(
-                new LinearLayoutManager(
-                        requireContext()
-                )
-        );
-
-        recyclerBranches.setLayoutManager(
-                new LinearLayoutManager(
-                        requireContext()
-                )
-        );
-
-
         recyclerDevices.setAdapter(
                 deviceAdapter
-        );
-
-        recyclerServices.setAdapter(
-                serviceAdapter
-        );
-
-        recyclerBranches.setAdapter(
-                branchAdapter
         );
     }
 
@@ -310,10 +239,47 @@ public class RepairBookingFragment extends Fragment {
                         getViewLifecycleOwner(),
                         services -> {
 
-                            serviceAdapter
-                                    .setServices(
-                                            services
-                                    );
+                            if (services == null) return;
+
+                            String[] serviceNames = new String[services.size()];
+                            for (int i = 0; i < services.size(); i++) {
+                                serviceNames[i] = services.get(i).getName();
+                            }
+
+                            ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                                    requireContext(),
+                                    android.R.layout.simple_dropdown_item_1line,
+                                    serviceNames
+                            ) {
+                                @NonNull
+                                @Override
+                                public android.widget.Filter getFilter() {
+                                    return new android.widget.Filter() {
+                                        @Override
+                                        protected FilterResults performFiltering(CharSequence constraint) {
+                                            FilterResults results = new FilterResults();
+                                            results.values = serviceNames;
+                                            results.count = serviceNames.length;
+                                            return results;
+                                        }
+                                        @Override
+                                        protected void publishResults(CharSequence constraint, FilterResults results) {
+                                            notifyDataSetChanged();
+                                        }
+                                    };
+                                }
+                            };
+                            
+                            actBookingService.setAdapter(adapter);
+                            
+                            actBookingService.setOnItemClickListener((parent, view, position, id) -> {
+                                selectedService = services.get(position);
+                                String name = selectedService.getName();
+                                if (name == null || name.trim().isEmpty()) {
+                                    name = "Selected service";
+                                }
+                                tvSelectedService.setText("Service: " + name);
+                            });
                         }
                 );
 
@@ -324,10 +290,47 @@ public class RepairBookingFragment extends Fragment {
                         getViewLifecycleOwner(),
                         branches -> {
 
-                            branchAdapter
-                                    .setBranches(
-                                            branches
-                                    );
+                            if (branches == null) return;
+
+                            String[] branchNames = new String[branches.size()];
+                            for (int i = 0; i < branches.size(); i++) {
+                                branchNames[i] = branches.get(i).getName();
+                            }
+
+                            ArrayAdapter<String> adapter = new ArrayAdapter<String>(
+                                    requireContext(),
+                                    android.R.layout.simple_dropdown_item_1line,
+                                    branchNames
+                            ) {
+                                @NonNull
+                                @Override
+                                public android.widget.Filter getFilter() {
+                                    return new android.widget.Filter() {
+                                        @Override
+                                        protected FilterResults performFiltering(CharSequence constraint) {
+                                            FilterResults results = new FilterResults();
+                                            results.values = branchNames;
+                                            results.count = branchNames.length;
+                                            return results;
+                                        }
+                                        @Override
+                                        protected void publishResults(CharSequence constraint, FilterResults results) {
+                                            notifyDataSetChanged();
+                                        }
+                                    };
+                                }
+                            };
+                            
+                            actBookingBranch.setAdapter(adapter);
+                            
+                            actBookingBranch.setOnItemClickListener((parent, view, position, id) -> {
+                                selectedBranch = branches.get(position);
+                                String name = selectedBranch.getName();
+                                if (name == null || name.trim().isEmpty()) {
+                                    name = "Selected branch";
+                                }
+                                tvSelectedBranch.setText("Branch: " + name);
+                            });
                         }
                 );
 
@@ -446,11 +449,29 @@ public class RepairBookingFragment extends Fragment {
         tvTitle.setText("Add New Device");
 
         String[] categories = {"Smartphone", "Laptop", "Tablet", "Desktop", "Smartwatch"};
-        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(
                 requireContext(),
                 android.R.layout.simple_dropdown_item_1line,
                 categories
-        );
+        ) {
+            @NonNull
+            @Override
+            public android.widget.Filter getFilter() {
+                return new android.widget.Filter() {
+                    @Override
+                    protected FilterResults performFiltering(CharSequence constraint) {
+                        FilterResults results = new FilterResults();
+                        results.values = categories;
+                        results.count = categories.length;
+                        return results;
+                    }
+                    @Override
+                    protected void publishResults(CharSequence constraint, FilterResults results) {
+                        notifyDataSetChanged();
+                    }
+                };
+            }
+        };
         actCategory.setAdapter(adapter);
         actCategory.setText("Smartphone", false);
 
