@@ -7,23 +7,29 @@ public class RegisterRequest {
     private String password;
     private String phone;
     private String city;
+    private String address;
     private String role;
 
     public RegisterRequest(String first_name, String last_name, String email, String password, String phone) {
-        this(first_name, last_name, email, password, phone, null, "CUSTOMER");
+        this(first_name, last_name, email, password, phone, null, null, "CUSTOMER");
     }
 
     public RegisterRequest(String first_name, String last_name, String email, String password, String phone, String city) {
-        this(first_name, last_name, email, password, phone, city, "CUSTOMER");
+        this(first_name, last_name, email, password, phone, city, null, "CUSTOMER");
     }
 
     public RegisterRequest(String first_name, String last_name, String email, String password, String phone, String city, String role) {
+        this(first_name, last_name, email, password, phone, city, null, role);
+    }
+    
+    public RegisterRequest(String first_name, String last_name, String email, String password, String phone, String city, String address, String role) {
         this.first_name = first_name;
         this.last_name = last_name;
         this.email = email;
         this.password = password;
         this.phone = phone;
         this.city = city;
+        this.address = address;
         this.role = role != null ? role : "CUSTOMER";
     }
 
@@ -33,5 +39,6 @@ public class RegisterRequest {
     public String getPassword() { return password; }
     public String getPhone() { return phone; }
     public String getCity() { return city; }
+    public String getAddress() { return address; }
     public String getRole() { return role; }
 }
