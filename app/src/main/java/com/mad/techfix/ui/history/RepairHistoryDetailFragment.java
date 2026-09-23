@@ -44,10 +44,7 @@ public class RepairHistoryDetailFragment extends Fragment {
     private TextView tvServiceName;
     private TextView tvBranchName, tvBranchCity;
     private TextView tvTechnicianName, tvEmployeeCode;
-    private TextView tvPaymentAmount, tvPaymentMethod, tvPaymentStatus;
-    private RecyclerView rvStatusHistory;
     private ProgressBar progressBar;
-    private View cardPayment;
 
     private ApiService apiService;
     private TokenManager tokenManager;
@@ -108,15 +105,28 @@ public class RepairHistoryDetailFragment extends Fragment {
         tvBranchCity = view.findViewById(R.id.tv_branch_city);
         tvTechnicianName = view.findViewById(R.id.tv_technician_name);
         tvEmployeeCode = view.findViewById(R.id.tv_employee_code);
-        tvPaymentAmount = view.findViewById(R.id.tv_payment_amount);
-        tvPaymentMethod = view.findViewById(R.id.tv_payment_method);
-        tvPaymentStatus = view.findViewById(R.id.tv_payment_status);
-        cardPayment = view.findViewById(R.id.card_payment);
-        rvStatusHistory = view.findViewById(R.id.rv_status_history);
         progressBar = view.findViewById(R.id.progress_bar);
 
-        rvStatusHistory.setLayoutManager(new LinearLayoutManager(requireContext()));
-        rvStatusHistory.setNestedScrollingEnabled(false);
+        View btnPayment = view.findViewById(R.id.btn_payment);
+        View btnStatusHistory = view.findViewById(R.id.btn_status_history);
+
+        btnPayment.setOnClickListener(v -> {
+            if (appointmentId != null) {
+                requireActivity().getSupportFragmentManager().beginTransaction()
+                        .replace(android.R.id.content, com.mad.techfix.ui.payment.PaymentFragment.newInstance(appointmentId))
+                        .addToBackStack(null)
+                        .commit();
+            }
+        });
+
+        btnStatusHistory.setOnClickListener(v -> {
+            if (appointmentId != null) {
+                requireActivity().getSupportFragmentManager().beginTransaction()
+                        .replace(android.R.id.content, StatusHistoryFragment.newInstance(appointmentId))
+                        .addToBackStack(null)
+                        .commit();
+            }
+        });
     }
 
     private void fetchAppointmentDetail() {
@@ -222,23 +232,5 @@ public class RepairHistoryDetailFragment extends Fragment {
         // Technician
         tvTechnicianName.setText(detail.getTechnician_full_name() != null ? detail.getTechnician_full_name() : "Not assigned");
         tvEmployeeCode.setText(detail.getTechnician_employee_code() != null ? detail.getTechnician_employee_code() : "N/A");
-
-        // Payment
-        if (detail.getPayment() != null) {
-            cardPayment.setVisibility(View.VISIBLE);
-            tvPaymentAmount.setText(String.format("$%.2f", detail.getPayment().getAmount()));
-            tvPaymentMethod.setText(detail.getPayment().getPayment_method() != null ? detail.getPayment().getPayment_method() : "N/A");
-            tvPaymentStatus.setText(detail.getPayment().getPayment_status() != null ? detail.getPayment().getPayment_status() : "PENDING");
-        } else {
-            cardPayment.setVisibility(View.GONE);
-        }
-
-        // Status History
-        List<AppointmentDetail.StatusHistory> history = detail.getStatus_history();
-        if (history != null && !history.isEmpty()) {
-            StatusHistoryAdapter historyAdapter = new StatusHistoryAdapter();
-            historyAdapter.updateList(history);
-            rvStatusHistory.setAdapter(historyAdapter);
-        }
     }
 }

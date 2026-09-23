@@ -54,6 +54,14 @@ public class PaymentFragment extends Fragment {
     private String clientSecret;
     private String currentPaymentId;
 
+    public static PaymentFragment newInstance(String appointmentId) {
+        PaymentFragment fragment = new PaymentFragment();
+        Bundle args = new Bundle();
+        args.putString("appointment_id", appointmentId);
+        fragment.setArguments(args);
+        return fragment;
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
@@ -71,6 +79,8 @@ public class PaymentFragment extends Fragment {
         recyclerView = view.findViewById(R.id.rv_payments);
         progressBar = view.findViewById(R.id.progress_bar);
         tvEmpty = view.findViewById(R.id.tv_empty);
+
+        view.findViewById(R.id.btn_back_payment).setOnClickListener(v -> requireActivity().onBackPressed());
 
         // Setup RecyclerView
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -94,6 +104,14 @@ public class PaymentFragment extends Fragment {
                 fetchPayments();
             }
         });
+
+        if (getArguments() != null && getArguments().containsKey("appointment_id")) {
+            String argApptId = getArguments().getString("appointment_id");
+            if (argApptId != null && !argApptId.isEmpty()) {
+                etAppointmentId.setText(argApptId);
+                fetchPayments();
+            }
+        }
     }
 
     // ==========================================

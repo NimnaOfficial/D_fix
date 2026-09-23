@@ -565,137 +565,33 @@
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Payment -->
-        <TextView
+        <!-- Payment Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_payment"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="💳 Payment"
-            android:textColor="@color/accent"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
-
-        <androidx.cardview.widget.CardView
-            android:id="@+id/card_payment"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginBottom="12dp"
-            app:cardBackgroundColor="@color/gray_dark"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp"
-            android:visibility="gone">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="Amount:"
-                        android:textColor="@color/gray_light"
-                        android:textSize="14sp" />
-                    <TextView
-                        android:id="@+id/tv_payment_amount"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="$0.00"
-                        android:textColor="@color/accent"
-                        android:textSize="16sp"
-                        android:textStyle="bold"
-                        android:gravity="end" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="Method:"
-                        android:textColor="@color/gray_light"
-                        android:textSize="14sp" />
-                    <TextView
-                        android:id="@+id/tv_payment_method"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="N/A"
-                        android:textColor="@color/white"
-                        android:textSize="14sp"
-                        android:gravity="end" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:orientation="horizontal">
-
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="Status:"
-                        android:textColor="@color/gray_light"
-                        android:textSize="14sp" />
-                    <TextView
-                        android:id="@+id/tv_payment_status"
-                        android:layout_width="0dp"
-                        android:layout_weight="1"
-                        android:layout_height="wrap_content"
-                        android:text="N/A"
-                        android:textColor="@color/white"
-                        android:textSize="14sp"
-                        android:gravity="end" />
-                </LinearLayout>
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
-
-        <!-- Status History (Timeline) -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="📜 Status History"
+            android:text="💳 View Payment"
+            android:textAllCaps="false"
             android:textColor="@color/accent"
             android:textSize="16sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="8dp" />
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/accent" />
 
-        <androidx.cardview.widget.CardView
+        <!-- Status History Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_status_history"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="54dp"
             android:layout_marginBottom="16dp"
-            app:cardBackgroundColor="@color/gray_dark"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="16dp">
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rv_status_history"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:nestedScrollingEnabled="false" />
-            </LinearLayout>
-        </androidx.cardview.widget.CardView>
+            android:text="📜 View Status History"
+            android:textAllCaps="false"
+            android:textColor="@color/accent"
+            android:textSize="16sp"
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/accent" />
 
     </LinearLayout>
 </ScrollView>

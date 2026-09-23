@@ -272,12 +272,12 @@ public class TechnicianRepairDetailViewModel
 
                         new TechnicianRepository
                                 .RepositoryCallback<
-                                List<Object>
+                                List<AppointmentDetail.StatusHistory>
                                 >() {
 
                             @Override
                             public void onSuccess(
-                                    List<Object> history
+                                    List<AppointmentDetail.StatusHistory> history
                             ) {
 
                                 repairNote.setValue(
@@ -305,7 +305,7 @@ public class TechnicianRepairDetailViewModel
 
 
     private String findLatestRepairNote(
-            List<Object> history
+            List<AppointmentDetail.StatusHistory> history
     ) {
 
         if (history == null
@@ -320,36 +320,20 @@ public class TechnicianRepairDetailViewModel
              i >= 0;
              i--) {
 
-            Object item =
+            AppointmentDetail.StatusHistory item =
                     history.get(i);
 
 
-            if (!(item instanceof Map)) {
+            String note = item.getNote();
+
+
+            if (note == null) {
 
                 continue;
             }
 
 
-            Map<?, ?> map =
-                    (Map<?, ?>) item;
-
-
-            Object noteValue =
-                    map.get(
-                            "note"
-                    );
-
-
-            if (noteValue == null) {
-
-                continue;
-            }
-
-
-            String note =
-                    String.valueOf(
-                            noteValue
-                    ).trim();
+            note = note.trim();
 
 
             if (note.isEmpty()) {

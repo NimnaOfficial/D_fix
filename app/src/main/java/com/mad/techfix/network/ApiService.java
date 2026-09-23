@@ -100,7 +100,7 @@ public interface ApiService {
     );
 
     @GET("api/appointments/{id}/history")
-    Call<ApiResponse<List<Object>>> getAppointmentHistory(
+    Call<ApiResponse<List<AppointmentDetail.StatusHistory>>> getAppointmentHistory(
             @Header("Authorization") String auth,
             @Path("id") String appointmentId
     );

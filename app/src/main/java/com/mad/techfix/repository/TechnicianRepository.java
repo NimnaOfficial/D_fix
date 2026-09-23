@@ -268,16 +268,16 @@ public class TechnicianRepository {
     public void getRepairHistory(
             String token,
             String appointmentId,
-            RepositoryCallback<List<Object>> callback
+            RepositoryCallback<List<AppointmentDetail.StatusHistory>> callback
     ) {
-        apiService.getAppointmentHistory(token, appointmentId).enqueue(new Callback<ApiResponse<List<Object>>>() {
+        apiService.getAppointmentHistory(token, appointmentId).enqueue(new Callback<ApiResponse<List<AppointmentDetail.StatusHistory>>>() {
             @Override
             public void onResponse(
-                    Call<ApiResponse<List<Object>>> call,
-                    Response<ApiResponse<List<Object>>> response
+                    Call<ApiResponse<List<AppointmentDetail.StatusHistory>>> call,
+                    Response<ApiResponse<List<AppointmentDetail.StatusHistory>>> response
             ) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    List<Object> history = response.body().getData();
+                    List<AppointmentDetail.StatusHistory> history = response.body().getData();
                     if (history == null) {
                         history = new ArrayList<>();
                     }
@@ -288,7 +288,7 @@ public class TechnicianRepository {
             }
 
             @Override
-            public void onFailure(Call<ApiResponse<List<Object>>> call, Throwable throwable) {
+            public void onFailure(Call<ApiResponse<List<AppointmentDetail.StatusHistory>>> call, Throwable throwable) {
                 callback.onError(getThrowableMessage(throwable, "Unable to load repair notes"));
             }
         });
