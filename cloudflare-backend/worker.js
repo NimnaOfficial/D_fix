@@ -1296,7 +1296,7 @@ export default {
         }
       }
 
-      // -- UPLOAD (ImgBB) --
+      // -- UPLOAD (R2) --
       if (path === "/api/upload" && request.method === "POST") {
         const user = await authenticate(request, env);
         if (!user) return json({ success: false, message: "Unauthorized" }, 401);
@@ -1305,24 +1305,20 @@ export default {
             const formData = await request.formData();
             const file = formData.get("file");
             if (!file) return json({ success: false, message: "No file provided" }, 400);
+            
+            const ext = file.name ? file.name.split('.').pop() : 'jpg';
+            const key = `uploads/${crypto.randomUUID()}.${ext}`;
+            
+            if (!env.BUCKET) return json({ success: false, message: "R2 Bucket not configured" }, 500);
 
-            // Using ImgBB as free cloud storage to bypass disabled R2 buckets
-            const imgbbData = new FormData();
-            imgbbData.append("key", "4b5b7cb36b2255745129c54e0c1f2115");
-            imgbbData.append("image", file);
-
-            const imgResponse = await fetch("https://api.imgbb.com/1/upload", {
-                method: "POST",
-                body: imgbbData
+            await env.BUCKET.put(key, file.stream(), {
+              httpMetadata: { contentType: file.type || 'image/jpeg' }
             });
             
-            const imgbbResult = await imgResponse.json();
-            
-            if (imgbbResult.success && imgbbResult.data && imgbbResult.data.url) {
-                return json({ success: true, url: imgbbResult.data.url });
-            } else {
-                return json({ success: false, message: "Image upload failed" }, 500);
-            }
+            // Return full url based on current request host
+            const hostUrl = new URL(request.url).origin;
+            const url = `${hostUrl}/api/images/${key}`;
+            return json({ success: true, url });
         } catch(err) {
             return json({ success: false, message: err.message }, 500);
         }
@@ -1872,30 +1868,25 @@ if (
 
         if (status === "PAID") {
           await env.DB.prepare(
-            INSERT INTO notifications (id, user_id, appointment_id, title, message, notification_type, is_read) VALUES (?, ?, ?, 'Payment Received', 'Payment confirmed.', 'PAYMENT', 0)
+            `INSERT INTO notifications (id, user_id, appointment_id, title, message, notification_type, is_read) VALUES (?, ?, ?, 'Payment Received', 'Payment confirmed.', 'PAYMENT', 0)`
           ).bind(crypto.randomUUID(), existing.customer_id, existing.apt_id).run();
 
           const aptDetails = await env.DB.prepare(
-            SELECT a.status, a.technician_id, a.branch_id, COALESCE(a.final_price, a.estimated_price) as total_bill, COALESCE((SELECT SUM(amount) FROM payments WHERE appointment_id = a.id AND payment_status = 'PAID'), 0) as total_paid FROM appointments a WHERE a.id = ?
+            `SELECT a.status, a.technician_id, a.branch_id, COALESCE(a.final_price, a.estimated_price) as total_bill, COALESCE((SELECT SUM(amount) FROM payments WHERE appointment_id = a.id AND payment_status = 'PAID'), 0) as total_paid FROM appointments a WHERE a.id = ?`
           ).bind(existing.apt_id).first();
 
           if (aptDetails && aptDetails.total_paid >= aptDetails.total_bill && aptDetails.status !== 'COMPLETED' && aptDetails.status !== 'CANCELLED') {
-              await env.DB.prepare(UPDATE appointments SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?).bind(existing.apt_id).run();
-              await env.DB.prepare(INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'COMPLETED', 'System auto-completed after full payment', ?)).bind(crypto.randomUUID(), existing.apt_id, user.id).run();
+              await env.DB.prepare(`UPDATE appointments SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(existing.apt_id).run();
+              await env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'COMPLETED', 'System auto-completed after full payment', ?)`).bind(crypto.randomUUID(), existing.apt_id, user.id).run();
 
               if (aptDetails.technician_id) {
-                  const pendingApt = await env.DB.prepare(SELECT a.id FROM appointments a INNER JOIN technician_services ts ON ts.service_id = a.service_id WHERE a.status = 'REQUESTED' AND a.branch_id = ? AND a.technician_id IS NULL AND ts.technician_id = ? ORDER BY a.created_at ASC LIMIT 1).bind(aptDetails.branch_id, aptDetails.technician_id).first();
+                  const pendingApt = await env.DB.prepare(`SELECT a.id FROM appointments a INNER JOIN technician_services ts ON ts.service_id = a.service_id WHERE a.status = 'REQUESTED' AND a.branch_id = ? AND a.technician_id IS NULL AND ts.technician_id = ? ORDER BY a.created_at ASC LIMIT 1`).bind(aptDetails.branch_id, aptDetails.technician_id).first();
                   
                   if (pendingApt) {
-                      await env.DB.prepare(UPDATE appointments SET technician_id = ?, status = 'ASSIGNED', updated_at = CURRENT_TIMESTAMP WHERE id = ?).bind(aptDetails.technician_id, pendingApt.id).run();
-                      await env.DB.prepare(INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'ASSIGNED', 'System auto-assigned to freed technician', ?)).bind(crypto.randomUUID(), pendingApt.id, user.id).run();
+                      await env.DB.prepare(`UPDATE appointments SET technician_id = ?, status = 'ASSIGNED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(aptDetails.technician_id, pendingApt.id).run();
+                      await env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'ASSIGNED', 'System auto-assigned to freed technician', ?)`).bind(crypto.randomUUID(), pendingApt.id, user.id).run();
                   } else {
-                      await env.DB.prepare(UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?).bind(aptDetails.technician_id).run();
-                  }
-              }
-          }
-        } else {
-                      await env.DB.prepare(UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?).bind(aptDetails.technician_id).run();
+                      await env.DB.prepare(`UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?`).bind(aptDetails.technician_id).run();
                   }
               }
           }
@@ -3423,5 +3414,4 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
     }
   },
 };
-
 
