@@ -1,4 +1,4 @@
-<div align="center">
+content = r"""<div align="center">
   <img src="https://img.icons8.com/color/120/000000/android-os.png" alt="Android Logo" width="80"/>
   <img src="https://img.icons8.com/color/120/000000/cloudflare.png" alt="Cloudflare Logo" width="80"/>
   
@@ -204,3 +204,6 @@ Follow these steps to deploy both the backend and frontend locally or to product
   <i>Built with ☕ for the Mobile Application Development Module.</i><br>
   <b>Licensed under the MIT License</b>
 </div>
+"""
+with open("README.md", "w", encoding="utf-8") as f:
+    f.write(content)

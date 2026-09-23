@@ -37,12 +37,8 @@ public class RepairBookingFragment extends Fragment {
 
     private RecyclerView recyclerDevices;
     private AutoCompleteTextView actBookingService;
-    private AutoCompleteTextView actBookingBranch;
-
     private TextView tvSelectedDevice;
     private TextView tvSelectedService;
-    private TextView tvSelectedBranch;
-
     private MaterialButton btnAddDevice;
     private MaterialButton btnContinue;
 
@@ -52,8 +48,6 @@ public class RepairBookingFragment extends Fragment {
 
     private Device selectedDevice;
     private Service selectedService;
-    private Branch selectedBranch;
-
     private String selectedDate;
     private String selectedTime;
 
@@ -122,11 +116,6 @@ public class RepairBookingFragment extends Fragment {
                         R.id.act_booking_service
                 );
 
-        actBookingBranch =
-                view.findViewById(
-                        R.id.act_booking_branch
-                );
-
         tvSelectedDevice =
                 view.findViewById(
                         R.id.tv_selected_device
@@ -135,11 +124,6 @@ public class RepairBookingFragment extends Fragment {
         tvSelectedService =
                 view.findViewById(
                         R.id.tv_selected_service
-                );
-
-        tvSelectedBranch =
-                view.findViewById(
-                        R.id.tv_selected_branch
                 );
 
         btnAddDevice =
@@ -279,57 +263,6 @@ public class RepairBookingFragment extends Fragment {
                                     name = "Selected service";
                                 }
                                 tvSelectedService.setText("Service: " + name);
-                            });
-                        }
-                );
-
-
-        viewModel
-                .getBranches()
-                .observe(
-                        getViewLifecycleOwner(),
-                        branches -> {
-
-                            if (branches == null) return;
-
-                            String[] branchNames = new String[branches.size()];
-                            for (int i = 0; i < branches.size(); i++) {
-                                branchNames[i] = branches.get(i).getName();
-                            }
-
-                            ArrayAdapter<String> adapter = new ArrayAdapter<String>(
-                                    requireContext(),
-                                    android.R.layout.simple_dropdown_item_1line,
-                                    branchNames
-                            ) {
-                                @NonNull
-                                @Override
-                                public android.widget.Filter getFilter() {
-                                    return new android.widget.Filter() {
-                                        @Override
-                                        protected FilterResults performFiltering(CharSequence constraint) {
-                                            FilterResults results = new FilterResults();
-                                            results.values = branchNames;
-                                            results.count = branchNames.length;
-                                            return results;
-                                        }
-                                        @Override
-                                        protected void publishResults(CharSequence constraint, FilterResults results) {
-                                            notifyDataSetChanged();
-                                        }
-                                    };
-                                }
-                            };
-                            
-                            actBookingBranch.setAdapter(adapter);
-                            
-                            actBookingBranch.setOnItemClickListener((parent, view, position, id) -> {
-                                selectedBranch = branches.get(position);
-                                String name = selectedBranch.getName();
-                                if (name == null || name.trim().isEmpty()) {
-                                    name = "Selected branch";
-                                }
-                                tvSelectedBranch.setText("Branch: " + name);
                             });
                         }
                 );
@@ -593,7 +526,7 @@ public class RepairBookingFragment extends Fragment {
         }
 
 
-        if (selectedBranch == null) {
+        if (false) {
 
             Toast.makeText(
                     requireContext(),
@@ -877,7 +810,7 @@ public class RepairBookingFragment extends Fragment {
 
         if (selectedDevice == null
                 || selectedService == null
-                || selectedBranch == null) {
+                ) {
 
             Toast.makeText(
                     requireContext(),
@@ -899,8 +832,8 @@ public class RepairBookingFragment extends Fragment {
                                 selectedService.getName(),
                                 selectedService.getBasePrice(),
 
-                                selectedBranch.getId(),
-                                selectedBranch.getName(),
+                                "auto",
+                                "Auto Assigned",
 
                                 selectedDate,
                                 selectedTime

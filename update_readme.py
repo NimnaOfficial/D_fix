@@ -1,4 +1,4 @@
-<div align="center">
+content = """<div align="center">
   <img src="https://img.icons8.com/color/120/000000/android-os.png" alt="Android Logo" width="80"/>
   <img src="https://img.icons8.com/color/120/000000/cloudflare.png" alt="Cloudflare Logo" width="80"/>
   
@@ -46,7 +46,7 @@ TechFix enforces strict RBAC to deliver customized dashboard experiences based o
 
 TechFix relies on an Edge-First architecture, ensuring extremely low latency and high availability by executing the backend on Cloudflare's global CDN nodes.
 
-```mermaid
+`mermaid
 graph TD
     %% Entities
     APP[📱 Android Native App<br>Retrofit / Java]
@@ -70,7 +70,7 @@ graph TD
     class EDGE cf
     class D1 db
     class CLOUDINARY cloud
-```
+`
 
 ---
 
@@ -78,7 +78,7 @@ graph TD
 
 The D1 database is highly normalized to ensure data integrity during parallel API transactions and automated routing algorithms.
 
-```mermaid
+`mermaid
 erDiagram
     USERS ||--o| CUSTOMERS : "has profile"
     USERS ||--o{ APPOINTMENTS : "technician assigned"
@@ -108,7 +108,7 @@ erDiagram
         float latitude
         float longitude
     }
-```
+`
 
 ---
 
@@ -120,38 +120,39 @@ Follow these steps to deploy both the backend and frontend locally or to product
 
 **Prerequisites:** 
 - Install [Node.js](https://nodejs.org/) and NPM.
-- Install Wrangler CLI: `npm install -g wrangler`
+- Install Wrangler CLI: 
+pm install -g wrangler
 
 <details>
 <summary><b>Click to expand backend deployment steps</b></summary>
 <br>
 
 1. **Login to Cloudflare**
-   ```bash
+   `ash
    npx wrangler login
-   ```
+   `
 2. **Navigate to the Backend Directory**
-   ```bash
+   `ash
    cd cloudflare-backend
-   ```
+   `
 3. **Initialize the Database**
    Create a new D1 database via your Cloudflare Dashboard, or using the CLI:
-   ```bash
+   `ash
    npx wrangler d1 create techfix-db
-   ```
-   *Copy the generated `database_id` and paste it into `cloudflare-backend/wrangler.toml`.*
+   `
+   *Copy the generated database_id and paste it into cloudflare-backend/wrangler.toml.*
 4. **Set Environment Variables**
-   Ensure `JWT_SECRET` is populated in your `wrangler.toml` file under the `[vars]` block for token generation to work successfully.
+   Ensure JWT_SECRET is populated in your wrangler.toml file under the [vars] block for token generation to work successfully.
 5. **Run the Schema Migrations**
    Push the table structures to your remote D1 instance:
-   ```bash
+   `ash
    npx wrangler d1 execute techfix-db --remote --file=./schema.sql
-   ```
+   `
 6. **Deploy the Worker**
-   ```bash
+   `ash
    npx wrangler deploy
-   ```
-   *This will output a live URL (e.g., `https://techfix-backend.<your-subdomain>.workers.dev`)*.
+   `
+   *This will output a live URL (e.g., https://techfix-backend.<your-subdomain>.workers.dev)*.
 
 </details>
 
@@ -166,15 +167,15 @@ Follow these steps to deploy both the backend and frontend locally or to product
 <br>
 
 1. **Open the Project**
-   Open the root `TECHFIX` folder inside Android Studio.
+   Open the root TECHFIX folder inside Android Studio.
 2. **Connect the Backend API**
    Open the following file:
-   `app/src/main/java/com/mad/techfix/network/RetrofitClient.java`
+   pp/src/main/java/com/mad/techfix/network/RetrofitClient.java
    
-   Replace the `BASE_URL` with your fully unified Cloudflare Worker deployment URL:
-   ```java
+   Replace the BASE_URL with your fully unified Cloudflare Worker deployment URL:
+   `java
    private static final String BASE_URL = "https://techfix-backend.codse251f-003.workers.dev/";
-   ```
+   `
 3. **Sync and Build**
    - Wait for Gradle to sync dependencies.
    - Click **Run (Shift + F10)** to launch the app on an emulator or physical device.
@@ -186,7 +187,7 @@ Follow these steps to deploy both the backend and frontend locally or to product
 ## 🔐 Security & Authentication
 * **PBKDF2 Hashing:** Passwords are never stored in plaintext. They are salted and hashed using 100k iterations of PBKDF2 (SHA-256) inside the V8 engine natively on the Cloudflare Edge.
 * **JWT (JSON Web Tokens):** Secure, stateless session management. Tokens include expiration claims and strict signature validation using HMAC Web Crypto API.
-* **Case-Insensitive Constraints:** Email collision checks and logins are strictly evaluated via `LOWER()` SQL queries to ensure case-insensitive routing.
+* **Case-Insensitive Constraints:** Email collision checks and logins are strictly evaluated via LOWER() SQL queries to ensure case-insensitive routing.
 * **Granular API Interceptors:** All API endpoints automatically validate the user's role claim against the required permissions before executing queries.
 
 ---
@@ -204,3 +205,6 @@ Follow these steps to deploy both the backend and frontend locally or to product
   <i>Built with ☕ for the Mobile Application Development Module.</i><br>
   <b>Licensed under the MIT License</b>
 </div>
+"""
+with open("README.md", "w", encoding="utf-8") as f:
+    f.write(content)

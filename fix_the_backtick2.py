@@ -1,0 +1,1 @@
+content = open("cloudflare-backend/worker.js", "r", encoding="utf-8").read(); content = content.replace("await env.DB.prepare(SELECT id, latitude, longitude FROM branches WHERE is_active = 1)", "await env.DB.prepare(`SELECT id, latitude, longitude FROM branches WHERE is_active = 1`)"); open("cloudflare-backend/worker.js", "w", encoding="utf-8").write(content)
