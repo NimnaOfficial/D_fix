@@ -157,8 +157,22 @@ public class MessagesActivity extends AppCompatActivity {
         });
         
         btnSendImage.setOnClickListener(v -> {
-            Intent intent = new Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
-            imagePickerLauncher.launch(intent);
+            com.mad.techfix.ui.camera.CameraFragment cameraFragment = new com.mad.techfix.ui.camera.CameraFragment();
+            android.os.Bundle args = new android.os.Bundle();
+            args.putString("appointment_id", appointmentId);
+            args.putBoolean("return_url_only", true);
+            cameraFragment.setArguments(args);
+            getSupportFragmentManager().beginTransaction()
+                    .replace(R.id.fragment_container, cameraFragment)
+                    .addToBackStack(null)
+                    .commit();
+        });
+
+        getSupportFragmentManager().setFragmentResultListener("camera_request", this, (requestKey, bundle) -> {
+            String imageUrl = bundle.getString("image_url");
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                sendMessage("Sent an image", imageUrl);
+            }
         });
 
         handler = new Handler(Looper.getMainLooper());

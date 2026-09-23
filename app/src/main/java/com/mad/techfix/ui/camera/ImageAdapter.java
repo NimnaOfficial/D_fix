@@ -24,6 +24,10 @@ public class ImageAdapter extends RecyclerView.Adapter<ImageAdapter.ViewHolder> 
         void onImageClick(RepairImage image);
         void onDeleteClick(RepairImage image);
     }
+    
+    public List<RepairImage> getImageList() {
+        return imageList;
+    }
 
     public ImageAdapter(OnImageClickListener listener) {
         this.listener = listener;
