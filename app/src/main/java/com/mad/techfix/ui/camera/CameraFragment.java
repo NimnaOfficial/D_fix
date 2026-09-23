@@ -314,14 +314,15 @@ public class CameraFragment extends Fragment {
     // UPLOAD IMAGE VIA CLOUDINARY
     // ==========================================
     private void uploadImage() {
-        String appointmentId = selectedAppointmentId;
-        if (appointmentId == null || appointmentId.trim().isEmpty()) {
-            Toast.makeText(getContext(), "Please select an appointment", Toast.LENGTH_SHORT).show();
+        if (!isUiAvailable()) return;
+        if (capturedFile == null || !capturedFile.exists()) {
+            Toast.makeText(getContext(), "Please capture an image first", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        if (capturedFile == null || !capturedFile.exists()) {
-            Toast.makeText(getContext(), "No photo to upload", Toast.LENGTH_SHORT).show();
+        String appointmentId = selectedAppointmentId;
+        if (appointmentId == null || appointmentId.trim().isEmpty()) {
+            Toast.makeText(getContext(), "No appointment selected", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -331,200 +332,69 @@ public class CameraFragment extends Fragment {
             return;
         }
 
-        Log.d(TAG, "📸 Starting upload for appointment: " + appointmentId);
-        Log.d(TAG, "📸 Token: " + (token != null ? token.substring(0, Math.min(token.length(), 20)) + "..." : "NULL"));
-        Log.d(TAG, "📸 File exists: " + capturedFile.exists() + ", size: " + capturedFile.length());
-
-        progressBar.setVisibility(View.VISIBLE);
         btnUpload.setEnabled(false);
+        progressBar.setVisibility(View.VISIBLE);
 
-        apiService.getCloudinarySignature("Bearer " + token).enqueue(new retrofit2.Callback<CloudinarySignatureResponse>() {
+        okhttp3.MediaType MEDIA_TYPE = okhttp3.MediaType.parse("image/jpeg");
+        okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(MEDIA_TYPE, capturedFile);
+        okhttp3.MultipartBody.Part filePart = okhttp3.MultipartBody.Part.createFormData("file", capturedFile.getName(), requestBody);
+
+        apiService.uploadFile("Bearer " + token, filePart).enqueue(new retrofit2.Callback<java.util.Map<String, Object>>() {
             @Override
-            public void onResponse(@NonNull retrofit2.Call<CloudinarySignatureResponse> call, @NonNull retrofit2.Response<CloudinarySignatureResponse> response) {
-                Log.d(TAG, "📡 Signature response code: " + response.code());
-
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    CloudinarySignatureResponse.CloudinaryData data = response.body().getData();
-                    Log.d(TAG, "✅ Signature received: cloudName=" + data.getCloudName() + ", apiKey=" + data.getApiKey());
-                    uploadToCloudinary(data, appointmentId);
+            public void onResponse(@NonNull retrofit2.Call<java.util.Map<String, Object>> call, @NonNull retrofit2.Response<java.util.Map<String, Object>> response) {
+                if (!isUiAvailable()) return;
+                
+                if (response.isSuccessful() && response.body() != null && Boolean.TRUE.equals(response.body().get("success"))) {
+                    String url = (String) response.body().get("url");
+                    saveImageUrlToBackend(appointmentId, url);
                 } else {
-                    String errorMsg = "Failed to get upload signature";
-                    try {
-                        if (response.errorBody() != null) {
-                            errorMsg = response.errorBody().string();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    Log.e(TAG, "❌ Signature error: " + errorMsg);
-                    Toast.makeText(getContext(), "❌ " + errorMsg, Toast.LENGTH_LONG).show();
                     progressBar.setVisibility(View.GONE);
                     btnUpload.setEnabled(true);
+                    Toast.makeText(getContext(), "Upload failed", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(@NonNull retrofit2.Call<CloudinarySignatureResponse> call, @NonNull Throwable t) {
-                Log.e(TAG, "❌ Network error getting signature: " + t.getMessage(), t);
-                Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            public void onFailure(@NonNull retrofit2.Call<java.util.Map<String, Object>> call, @NonNull Throwable t) {
+                if (!isUiAvailable()) return;
                 progressBar.setVisibility(View.GONE);
                 btnUpload.setEnabled(true);
-            }
-        });
-    }
-
-    private void uploadToCloudinary(CloudinarySignatureResponse.CloudinaryData data, String appointmentId) {
-        if (!isUiAvailable() || data == null || capturedFile == null || !capturedFile.exists()) {
-            resetUploadState();
-            return;
-        }
-
-        File fileToUpload = capturedFile;
-        String cloudName = data.getCloudName();
-        String apiKey = data.getApiKey();
-        String signature = data.getSignature();
-        String folder = data.getFolder();
-        String uploadPreset = data.getUploadPreset();
-
-        if (isBlank(cloudName) || isBlank(apiKey) || isBlank(signature)
-                || isBlank(folder) || isBlank(uploadPreset)) {
-            Log.e(TAG, "❌ Cloudinary signature response is incomplete");
-            showUploadError("Invalid upload configuration");
-            return;
-        }
-
-        MediaType MEDIA_TYPE_JPG = MediaType.parse("image/jpeg");
-        RequestBody requestBody = RequestBody.create(MEDIA_TYPE_JPG, fileToUpload);
-
-        MultipartBody.Builder builder = new MultipartBody.Builder()
-                .setType(MultipartBody.FORM)
-                .addFormDataPart("file", fileToUpload.getName(), requestBody)
-                .addFormDataPart("api_key", apiKey)
-                .addFormDataPart("timestamp", String.valueOf(data.getTimestamp()))
-                .addFormDataPart("signature", signature)
-                .addFormDataPart("folder", folder)
-                .addFormDataPart("upload_preset", uploadPreset);
-
-        RequestBody cloudinaryBody = builder.build();
-        String cloudinaryUrl = "https://api.cloudinary.com/v1_1/" + cloudName + "/image/upload";
-
-        Log.d(TAG, "📡 Uploading to Cloudinary: " + cloudinaryUrl);
-
-        Request cloudinaryRequest = new Request.Builder()
-                .url(cloudinaryUrl)
-                .post(cloudinaryBody)
-                .build();
-
-        okHttpClient.newCall(cloudinaryRequest).enqueue(new okhttp3.Callback() {
-            @Override
-            public void onResponse(@NonNull okhttp3.Call call, @NonNull okhttp3.Response response) throws IOException {
-                okhttp3.ResponseBody responseBody = response.body();
-                if (response.isSuccessful() && responseBody != null) {
-                    String jsonResponse = responseBody.string();
-                    Log.d(TAG, "📡 Cloudinary response: " + jsonResponse);
-                    try {
-                        JSONObject jsonObject = new JSONObject(jsonResponse);
-                        String secureUrl = jsonObject.getString("secure_url");
-                        Log.d(TAG, "✅ Uploaded to Cloudinary, secure_url: " + secureUrl);
-
-                        runOnUiThreadSafely(() -> {
-                            saveImageUrlToBackend(appointmentId, secureUrl);
-                        });
-
-                    } catch (JSONException e) {
-                        Log.e(TAG, "❌ Failed to parse Cloudinary response: " + e.getMessage(), e);
-                        runOnUiThreadSafely(() -> {
-                            Toast.makeText(getContext(), "Failed to parse Cloudinary response", Toast.LENGTH_SHORT).show();
-                            progressBar.setVisibility(View.GONE);
-                            btnUpload.setEnabled(true);
-                        });
-                    }
-                } else {
-                    String errorBody = response.body() != null ? response.body().string() : "null";
-                    Log.e(TAG, "❌ Cloudinary upload failed: " + response.code() + " - " + errorBody);
-                    runOnUiThreadSafely(() -> {
-                        Toast.makeText(getContext(), "Cloudinary upload failed: " + response.code(), Toast.LENGTH_SHORT).show();
-                        progressBar.setVisibility(View.GONE);
-                        btnUpload.setEnabled(true);
-                    });
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull okhttp3.Call call, @NonNull IOException e) {
-                Log.e(TAG, "❌ Cloudinary error: " + e.getMessage(), e);
-                runOnUiThreadSafely(() -> {
-                    Toast.makeText(getContext(), "Cloudinary error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    progressBar.setVisibility(View.GONE);
-                    btnUpload.setEnabled(true);
-                });
+                Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
     }
 
     private void saveImageUrlToBackend(String appointmentId, String imageUrl) {
-        if (!isUiAvailable()) {
-            return;
-        }
-
+        if (!isUiAvailable()) return;
         String token = tokenManager.getToken();
-        if (token == null) {
-            progressBar.setVisibility(View.GONE);
-            btnUpload.setEnabled(true);
-            return;
-        }
+        if (token == null) return;
 
-        Log.d(TAG, "📡 Saving image URL to backend: " + imageUrl);
-
-        ImageUploadRequest request = new ImageUploadRequest(imageUrl, "BEFORE_REPAIR");
-
-        apiService.uploadImage("Bearer " + token, appointmentId, request).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+        com.mad.techfix.models.ImageUploadRequest request = new com.mad.techfix.models.ImageUploadRequest(imageUrl, "BEFORE_REPAIR");
+        apiService.uploadImage("Bearer " + token, appointmentId, request).enqueue(new retrofit2.Callback<com.mad.techfix.models.ApiResponse<Object>>() {
             @Override
-            public void onResponse(@NonNull retrofit2.Call<ApiResponse<Object>> call, @NonNull retrofit2.Response<ApiResponse<Object>> response) {
-                if (!isUiAvailable()) {
-                    return;
-                }
-
+            public void onResponse(@NonNull retrofit2.Call<com.mad.techfix.models.ApiResponse<Object>> call, @NonNull retrofit2.Response<com.mad.techfix.models.ApiResponse<Object>> response) {
+                if (!isUiAvailable()) return;
                 progressBar.setVisibility(View.GONE);
                 btnUpload.setEnabled(true);
-
-                Log.d(TAG, "📡 Backend save response code: " + response.code());
-
+                
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    Toast.makeText(getContext(), "✅ Image uploaded successfully!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Image uploaded successfully!", Toast.LENGTH_SHORT).show();
                     capturedFile = null;
                     fetchImages();
                 } else {
-                    String errorMsg = "Failed to save image";
-                    try {
-                        if (response.errorBody() != null) {
-                            errorMsg = response.errorBody().string();
-                        }
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                    Log.e(TAG, "❌ Backend save error: " + errorMsg);
-                    Toast.makeText(getContext(), "❌ " + errorMsg, Toast.LENGTH_LONG).show();
+                    Toast.makeText(getContext(), "Failed to save image", Toast.LENGTH_LONG).show();
                 }
             }
-
             @Override
-            public void onFailure(@NonNull retrofit2.Call<ApiResponse<Object>> call, @NonNull Throwable t) {
-                if (!isUiAvailable()) {
-                    return;
-                }
-
+            public void onFailure(@NonNull retrofit2.Call<com.mad.techfix.models.ApiResponse<Object>> call, @NonNull Throwable t) {
+                if (!isUiAvailable()) return;
                 progressBar.setVisibility(View.GONE);
                 btnUpload.setEnabled(true);
-                Log.e(TAG, "❌ Network error saving image: " + t.getMessage(), t);
                 Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
     }
 
-    // ==========================================
-    // FETCH IMAGES
-    // ==========================================
     private void fetchImages() {
         if (!isUiAvailable()) {
             return;

@@ -15,6 +15,7 @@ import com.mad.techfix.R;
 
 public class BookingConfirmationFragment extends Fragment {
 
+    private static final String ARG_APPOINTMENT_ID = "appointment_id";
     private static final String ARG_APPOINTMENT_NUMBER =
             "appointment_number";
 
@@ -46,7 +47,9 @@ public class BookingConfirmationFragment extends Fragment {
 
     private MaterialButton btnViewAppointments;
     private MaterialButton btnHome;
+    private com.google.android.material.button.MaterialButton btnUploadPhoto;
 
+    private String appointmentId;
     private String appointmentNumber;
     private String deviceName;
     private String serviceName;
@@ -60,6 +63,7 @@ public class BookingConfirmationFragment extends Fragment {
     }
 
     public static BookingConfirmationFragment newInstance(
+            String appointmentId,
             String appointmentNumber,
             String deviceName,
             String serviceName,
@@ -75,6 +79,7 @@ public class BookingConfirmationFragment extends Fragment {
         Bundle args =
                 new Bundle();
 
+        args.putString(ARG_APPOINTMENT_ID, appointmentId);
         args.putString(
                 ARG_APPOINTMENT_NUMBER,
                 appointmentNumber
@@ -161,6 +166,7 @@ public class BookingConfirmationFragment extends Fragment {
             return;
         }
 
+        appointmentId = args.getString(ARG_APPOINTMENT_ID);
         appointmentNumber =
                 args.getString(
                         ARG_APPOINTMENT_NUMBER
@@ -245,6 +251,7 @@ public class BookingConfirmationFragment extends Fragment {
                 view.findViewById(
                         R.id.btn_confirmation_home
                 );
+        btnUploadPhoto = view.findViewById(R.id.btn_upload_photo);
     }
 
     private void displayConfirmation() {
@@ -310,6 +317,9 @@ public class BookingConfirmationFragment extends Fragment {
         btnHome.setOnClickListener(
                 v -> returnHome()
         );
+        if (btnUploadPhoto != null) {
+            btnUploadPhoto.setOnClickListener(v -> openCamera());
+        }
     }
 
     private void openMyAppointments() {
@@ -363,5 +373,20 @@ public class BookingConfirmationFragment extends Fragment {
         }
 
         return value.trim();
+    }
+
+    private void openCamera() {
+        if (appointmentId != null && !appointmentId.isEmpty()) {
+            com.mad.techfix.ui.camera.CameraFragment cameraFragment = new com.mad.techfix.ui.camera.CameraFragment();
+            android.os.Bundle args = new android.os.Bundle();
+            args.putString("appointment_id", appointmentId);
+            cameraFragment.setArguments(args);
+            getParentFragmentManager().beginTransaction()
+                .replace(getId(), cameraFragment)
+                .addToBackStack(null)
+                .commit();
+        } else {
+            android.widget.Toast.makeText(requireContext(), "Appointment ID not found", android.widget.Toast.LENGTH_SHORT).show();
+        }
     }
 }

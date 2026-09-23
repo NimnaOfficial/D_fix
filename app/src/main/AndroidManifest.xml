@@ -74,6 +74,7 @@
             android:exported="false"
             android:theme="@style/Theme.TECHFIX" />
 
+            <activity android:name=".ui.messages.MessagesActivity" android:exported="false" />
     </application>
 
 </manifest>

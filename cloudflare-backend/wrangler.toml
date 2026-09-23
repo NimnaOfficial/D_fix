@@ -11,3 +11,6 @@ binding = "DB" # This corresponds to env.DB in worker.js
 database_name = "techfix-db"
 database_id = "ec5afab2-05ef-4b73-837d-963fe460d3db"
 # preview_database_id = "YOUR_PREVIEW_DATABASE_ID_HERE"
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "techfix-images"

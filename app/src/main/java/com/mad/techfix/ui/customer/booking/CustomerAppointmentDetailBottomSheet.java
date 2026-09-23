@@ -53,6 +53,7 @@ public class CustomerAppointmentDetailBottomSheet
 
     private MaterialButton btnViewRepairHistory;
     private MaterialButton btnCancelAppointment;
+    private MaterialButton btnMessages;
 
 
     private CustomerAppointmentDetailViewModel viewModel;
@@ -307,6 +308,7 @@ public class CustomerAppointmentDetailBottomSheet
                 view.findViewById(
                         R.id.btn_cancel_appointment
                 );
+        btnMessages = view.findViewById(R.id.btn_messages);
     }
 
 

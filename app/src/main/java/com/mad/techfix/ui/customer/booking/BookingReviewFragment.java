@@ -500,6 +500,7 @@ public class BookingReviewFragment extends Fragment {
                                     false;
 
 
+                            String appointmentId = data.containsKey("id") ? String.valueOf(data.get("id")) : "";
                             String appointmentNumber =
                                     "";
 
@@ -563,6 +564,7 @@ public class BookingReviewFragment extends Fragment {
 
 
                             openConfirmationScreen(
+                                    appointmentId,
                                     appointmentNumber,
                                     appointmentStatus
                             );
@@ -1290,6 +1292,7 @@ public class BookingReviewFragment extends Fragment {
     // ==========================================
 
     private void openConfirmationScreen(
+            String appointmentId,
             String appointmentNumber,
             String appointmentStatus
     ) {
@@ -1298,6 +1301,7 @@ public class BookingReviewFragment extends Fragment {
                 confirmationFragment =
                 BookingConfirmationFragment
                         .newInstance(
+                                appointmentId,
                                 appointmentNumber,
                                 deviceName,
                                 serviceName,

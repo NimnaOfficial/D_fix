@@ -237,3 +237,4 @@ FOR EACH ROW BEGIN UPDATE appointments SET updated_at = CURRENT_TIMESTAMP WHERE 
 
 CREATE TRIGGER IF NOT EXISTS update_branch_spare_parts_updated_at AFTER UPDATE ON branch_spare_parts
 FOR EACH ROW BEGIN UPDATE branch_spare_parts SET updated_at = CURRENT_TIMESTAMP WHERE branch_id = OLD.branch_id AND part_id = OLD.part_id; END;
+CREATE TABLE IF NOT EXISTS messages ( id TEXT PRIMARY KEY, appointment_id TEXT NOT NULL, sender_id TEXT NOT NULL, receiver_id TEXT NOT NULL, message TEXT, image_url TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(appointment_id) REFERENCES appointments(id), FOREIGN KEY(sender_id) REFERENCES users(id), FOREIGN KEY(receiver_id) REFERENCES users(id) ); 

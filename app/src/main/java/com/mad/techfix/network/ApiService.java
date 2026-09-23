@@ -324,4 +324,30 @@ public interface ApiService {
     Call<ApiResponse<List<com.mad.techfix.models.reports.BranchReport>>> getBranchPerformanceReport(
             @Header("Authorization") String auth
     );
+
+    // ==========================================
+    // MESSAGING & R2 UPLOAD
+    // ==========================================
+
+    @POST("api/appointments/{id}/messages")
+    Call<ApiResponse<Object>> sendMessage(
+            @Header("Authorization") String auth,
+            @Path("id") String appointmentId,
+            @Body java.util.Map<String, String> body
+    );
+
+    @GET("api/appointments/{id}/messages")
+    Call<ApiResponse<java.util.List<com.mad.techfix.models.Message>>> getMessages(
+            @Header("Authorization") String auth,
+            @Path("id") String appointmentId
+    );
+
+    @retrofit2.http.Multipart
+    @POST("api/upload")
+    Call<java.util.Map<String, Object>> uploadFile(
+            @Header("Authorization") String auth,
+            @retrofit2.http.Part okhttp3.MultipartBody.Part file
+    );
+
 }
+

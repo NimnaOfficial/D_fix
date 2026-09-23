@@ -353,6 +353,16 @@
         </com.google.android.material.card.MaterialCardView>
 
 
+                <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_messages"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="22dp"
+            android:text="Messages"
+            android:textAllCaps="false"
+            app:cornerRadius="12dp" />
+            
         <!-- Repair History -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_view_repair_history"

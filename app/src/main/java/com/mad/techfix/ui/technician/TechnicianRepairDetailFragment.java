@@ -80,6 +80,7 @@ public class TechnicianRepairDetailFragment
 
     private MaterialButton btnUpdateRepairStatus;
     private MaterialButton btnViewRepairHistory;
+    private MaterialButton btnMessages;
 
 
     private final List<String> repairImageUrls =
