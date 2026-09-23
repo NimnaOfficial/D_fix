@@ -1233,15 +1233,16 @@ export default {
           try {
               const { message, image_url } = await request.json();
               const appt = await env.DB.prepare(`SELECT * FROM appointments WHERE id = ?`).bind(appointmentId).first();
-              if (!appt || (appt.status !== 'ASSIGNED' && appt.status !== 'DIAGNOSING' && appt.status !== 'REPAIRING' && appt.status !== 'TESTING')) {
-                return json({ success: false, message: "Messages only allowed during active repair" }, 400);
+              if (!appt) {
+                return json({ success: false, message: "Appointment not found" }, 404);
               }
               
-              let receiver_id = "";
+              let receiver_id = "UNKNOWN";
               if (user.role === "CUSTOMER") {
-                 let tech = await env.DB.prepare(`SELECT user_id FROM technicians WHERE id = ?`).bind(appt.technician_id).first();
-                 if (!tech) return json({ success: false, message: "Technician not assigned" }, 400);
-                 receiver_id = tech.user_id;
+                 if (appt.technician_id) {
+                     let tech = await env.DB.prepare(`SELECT user_id FROM technicians WHERE id = ?`).bind(appt.technician_id).first();
+                     if (tech) receiver_id = tech.user_id;
+                 }
               } else {
                  receiver_id = appt.customer_id;
               }

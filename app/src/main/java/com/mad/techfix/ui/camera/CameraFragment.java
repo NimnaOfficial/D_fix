@@ -135,6 +135,12 @@ public class CameraFragment extends Fragment {
         okHttpClient = new OkHttpClient();
         loadCustomerAppointments();
 
+        if (getArguments() != null && getArguments().getString("appointment_id") != null) {
+            selectedAppointmentId = getArguments().getString("appointment_id");
+            etAppointmentId.setText(selectedAppointmentId, false);
+            fetchImages();
+        }
+
         // Check permissions
         if (hasCameraPermission()) {
             startCamera();

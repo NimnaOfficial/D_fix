@@ -399,11 +399,18 @@ public class CustomerAppointmentDetailBottomSheet
                         view -> openRepairHistory()
                 );
 
-
         btnCancelAppointment
                 .setOnClickListener(
                         view -> showCancellationMessage()
                 );
+
+        btnMessages.setOnClickListener(view -> {
+            if (appointmentId != null) {
+                android.content.Intent intent = new android.content.Intent(requireContext(), com.mad.techfix.ui.messages.MessagesActivity.class);
+                intent.putExtra("appointment_id", appointmentId);
+                startActivity(intent);
+            }
+        });
     }
 
 
