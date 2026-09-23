@@ -5,6 +5,7 @@ compatibility_date = "2024-01-01"
 # Automatically handle variables/secrets like JWT_SECRET through Cloudflare Dashboard or .dev.vars locally
 [vars]
 JWT_SECRET = "techfix_super_secret_jwt_key_2026"
+STRIPE_SECRET_KEY = "YOUR_STRIPE_SECRET_KEY"
 # Add non-sensitive variables here
 
 [[d1_databases]]

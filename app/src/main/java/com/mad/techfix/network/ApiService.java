@@ -138,7 +138,7 @@ public interface ApiService {
     Call<ApiResponse<Object>> updatePaymentStatus(
             @Header("Authorization") String auth,
             @Path("id") String paymentId,
-            @Body Payment payment
+            @Body java.util.Map<String, String> statusMap
     );
 
 

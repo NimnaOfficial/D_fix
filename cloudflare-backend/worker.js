@@ -1835,8 +1835,8 @@ if (
         request.method === "PUT"
       ) {
         const user = await authenticate(request, env);
-        if (!user || user.role === "CUSTOMER")
-          return json({ success: false, message: "Access denied" }, 403);
+        if (!user)
+          return json({ success: false, message: "Unauthorized" }, 401);
         const paymentId = path.split("/")[3];
         const { status } = await request.json();
 
@@ -1848,6 +1848,9 @@ if (
         if (!existing)
           return json({ success: false, message: "Not found" }, 404);
 
+        if (user.role === "CUSTOMER" && existing.customer_id !== user.id) {
+          return json({ success: false, message: "Access denied" }, 403);
+        }
         if (user.role === "MANAGER") {
             if (!user.managerBranchId) return json({ success: false, message: "Manager branch missing" }, 403);
             if (existing.branch_id !== user.managerBranchId) {
@@ -1864,11 +1867,6 @@ if (
           .run();
 
         if (status === "PAID") {
-          await env.DB.prepare(
-            `UPDATE appointments SET final_price = ? WHERE id = ? AND final_price IS NULL`,
-          )
-            .bind(existing.amount, existing.apt_id)
-            .run();
           await env.DB.prepare(
             `INSERT INTO notifications (id, user_id, appointment_id, title, message, notification_type, is_read) VALUES (?, ?, ?, 'Payment Received', 'Payment confirmed.', 'PAYMENT', 0)`,
           )
@@ -1970,6 +1968,16 @@ if (
               },
               400,
             );
+          }
+
+          // Save to DB so client can confirm it
+          try {
+              await env.DB.prepare(
+                `INSERT INTO payments (id, appointment_id, amount, payment_method, payment_status)
+                 VALUES (?, ?, ?, 'CARD', 'PENDING')`
+              ).bind(stripeData.id, repairId, amount / 100.0).run();
+          } catch (e) {
+              console.error("Failed to save payment intent to DB", e);
           }
 
           return json({
@@ -3388,3 +3396,4 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
     }
   },
 };
+

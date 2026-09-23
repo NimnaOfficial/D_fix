@@ -25,9 +25,15 @@ import com.mad.techfix.network.ApiService;
 import com.mad.techfix.network.RetrofitClient;
 import com.mad.techfix.utils.StripeConfig;
 import com.mad.techfix.utils.TokenManager;
-import com.stripe.android.PaymentConfiguration;
-import com.stripe.android.paymentsheet.PaymentSheet;
-import com.stripe.android.paymentsheet.PaymentSheetResult;
+import com.stripe.android.ApiResultCallback;
+import com.stripe.android.PaymentIntentResult;
+import com.stripe.android.Stripe;
+import com.stripe.android.model.ConfirmPaymentIntentParams;
+import com.stripe.android.model.PaymentIntent;
+import com.stripe.android.model.PaymentMethodCreateParams;
+import com.stripe.android.model.StripeIntent;
+import com.stripe.android.view.CardMultilineWidget;
+import android.content.Intent;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -44,14 +50,13 @@ public class PaymentFragment extends Fragment {
     private MaterialButton btnStripePay;
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
-    private TextView tvEmpty;
+    private TextView tvEmpty, tvBalance;
     private PaymentAdapter adapter;
     private ApiService apiService;
     private TokenManager tokenManager;
 
-    // Stripe PaymentSheet
-    private PaymentSheet paymentSheet;
-    private String clientSecret;
+    private CardMultilineWidget cardInputWidget;
+    private Stripe stripe;
     private String currentPaymentId;
 
     public static PaymentFragment newInstance(String appointmentId) {
@@ -79,6 +84,8 @@ public class PaymentFragment extends Fragment {
         recyclerView = view.findViewById(R.id.rv_payments);
         progressBar = view.findViewById(R.id.progress_bar);
         tvEmpty = view.findViewById(R.id.tv_empty);
+tvBalance = view.findViewById(R.id.tv_balance);
+        cardInputWidget = view.findViewById(R.id.cardInputWidget);
 
         view.findViewById(R.id.btn_back_payment).setOnClickListener(v -> requireActivity().onBackPressed());
 
@@ -91,9 +98,8 @@ public class PaymentFragment extends Fragment {
         apiService = RetrofitClient.getClient().create(ApiService.class);
         tokenManager = new TokenManager(requireContext());
 
-        // Initialize Stripe PaymentSheet
-        PaymentConfiguration.init(requireContext(), StripeConfig.PUBLISHABLE_KEY);
-        paymentSheet = new PaymentSheet(this, this::onPaymentSheetResult);
+        // Initialize Stripe SDK
+        stripe = new Stripe(requireContext(), StripeConfig.PUBLISHABLE_KEY);
 
         // Stripe Payment Button
         btnStripePay.setOnClickListener(v -> startStripePayment());
@@ -130,6 +136,12 @@ public class PaymentFragment extends Fragment {
             return;
         }
 
+        PaymentMethodCreateParams params = cardInputWidget.getPaymentMethodCreateParams();
+        if (params == null) {
+            Toast.makeText(getContext(), "Please enter valid card details", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         long amount;
         try {
             amount = (long) (Double.parseDouble(amountStr) * 100); // Convert to cents
@@ -155,9 +167,11 @@ public class PaymentFragment extends Fragment {
                         btnStripePay.setEnabled(true);
 
                         if (response.isSuccessful() && response.body() != null) {
-                            clientSecret = response.body().getClientSecret();
+                            String clientSecret = response.body().getClientSecret();
                             currentPaymentId = response.body().getPaymentId();
-                            presentPaymentSheet();
+                            
+                            ConfirmPaymentIntentParams confirmParams = ConfirmPaymentIntentParams.createWithPaymentMethodCreateParams(params, clientSecret);
+                            stripe.confirmPayment(PaymentFragment.this, confirmParams);
                         } else {
                             String errorMsg = "Failed to create payment intent";
                             try {
@@ -180,33 +194,39 @@ public class PaymentFragment extends Fragment {
                 });
     }
 
-    private void presentPaymentSheet() {
-        PaymentSheet.Configuration configuration = new PaymentSheet.Configuration("TechFixCustomer");
-        paymentSheet.presentWithPaymentIntent(clientSecret, configuration);
-    }
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
 
-    private void onPaymentSheetResult(@NonNull PaymentSheetResult result) {
-        if (result instanceof PaymentSheetResult.Completed) {
-            Toast.makeText(getContext(), "✅ Stripe payment successful!", Toast.LENGTH_SHORT).show();
-            updatePaymentStatus(currentPaymentId, "PAID");
+        stripe.onPaymentResult(requestCode, data, new ApiResultCallback<PaymentIntentResult>() {
+            @Override
+            public void onSuccess(@NonNull PaymentIntentResult result) {
+                PaymentIntent paymentIntent = result.getIntent();
+                StripeIntent.Status status = paymentIntent.getStatus();
+                if (status == StripeIntent.Status.Succeeded) {
+                    Toast.makeText(getContext(), "✅ Stripe payment successful!", Toast.LENGTH_SHORT).show();
+                    updatePaymentStatus(currentPaymentId, "PAID");
+                    cardInputWidget.clear();
+                } else if (status == StripeIntent.Status.RequiresPaymentMethod) {
+                    Toast.makeText(getContext(), "Payment failed or requires new payment method", Toast.LENGTH_SHORT).show();
+                }
+            }
 
-        } else if (result instanceof PaymentSheetResult.Canceled) {
-            Toast.makeText(getContext(), "Payment canceled", Toast.LENGTH_SHORT).show();
-
-        } else if (result instanceof PaymentSheetResult.Failed) {
-            String error = ((PaymentSheetResult.Failed) result).getError().getMessage();
-            Toast.makeText(getContext(), "❌ Payment failed: " + error, Toast.LENGTH_LONG).show();
-        }
+            @Override
+            public void onError(@NonNull Exception e) {
+                Toast.makeText(getContext(), "❌ Payment failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private void updatePaymentStatus(String paymentId, String status) {
         String token = tokenManager.getToken();
         if (token == null) return;
 
-        Payment payment = new Payment();
-        payment.setPayment_status(status);
+        java.util.Map<String, String> statusMap = new java.util.HashMap<>();
+        statusMap.put("status", status);
 
-        apiService.updatePaymentStatus("Bearer " + token, paymentId, payment)
+        apiService.updatePaymentStatus("Bearer " + token, paymentId, statusMap)
                 .enqueue(new Callback<ApiResponse<Object>>() {
                     @Override
                     public void onResponse(@NonNull Call<ApiResponse<Object>> call, @NonNull Response<ApiResponse<Object>> response) {
@@ -280,3 +300,4 @@ public class PaymentFragment extends Fragment {
                 });
     }
 }
+

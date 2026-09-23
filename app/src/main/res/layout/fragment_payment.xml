@@ -74,12 +74,23 @@
                     android:textColorHint="@color/gray_light" />
             </com.google.android.material.textfield.TextInputLayout>
 
+            <TextView
+                android:id="@+id/tv_balance"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Balance Due: $0.00"
+                android:textColor="@color/accent"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"
+                android:visibility="gone" />
+
             <!-- Amount -->
             <com.google.android.material.textfield.TextInputLayout
                 style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="24dp"
                 app:boxStrokeColor="@color/accent"
                 app:hintTextColor="@color/gray_light">
 
@@ -93,42 +104,41 @@
                     android:textColorHint="@color/gray_light" />
             </com.google.android.material.textfield.TextInputLayout>
 
-            <!-- Pay with Stripe Button -->
-            <!-- Payment Method Spinner -->
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Payment Details"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="12dp"/>
+
+            <androidx.cardview.widget.CardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="16dp"
-                app:boxStrokeColor="@color/accent"
-                app:hintTextColor="@color/gray_light">
+                android:layout_marginBottom="24dp"
+                app:cardBackgroundColor="@color/white"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
 
-                <androidx.appcompat.widget.AppCompatSpinner
-                    android:id="@+id/spinner_payment_method"
+                <com.stripe.android.view.CardMultilineWidget
+                    android:id="@+id/cardInputWidget"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:entries="@array/payment_methods"
-                    android:textColor="@color/white" />
-            </com.google.android.material.textfield.TextInputLayout>
+                    android:padding="12dp" />
+            </androidx.cardview.widget.CardView>
 
-            <!-- Create Payment Button (CASH) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_create_payment"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Record Cash Payment"
-                android:textColor="@color/white"
-                app:backgroundTint="@color/accent" />
-
-            <!-- NEW: Pay with Stripe Button -->
+            <!-- Pay with Stripe Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_stripe_pay"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Pay with Stripe"
+                android:layout_height="56dp"
+                android:text="Pay Securely"
+                android:textSize="16sp"
+                android:textStyle="bold"
                 android:textColor="@color/white"
-                app:backgroundTint="@color/status_cancelled" />
+                app:cornerRadius="8dp"
+                app:backgroundTint="#6772E5" /> <!-- Stripe Blue Color -->
 
         </LinearLayout>
     </androidx.cardview.widget.CardView>
