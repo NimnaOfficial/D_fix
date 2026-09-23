@@ -108,6 +108,10 @@ public class RepairHistoryDetailFragment extends Fragment {
         progressBar = view.findViewById(R.id.progress_bar);
 
         View btnPayment = view.findViewById(R.id.btn_payment);
+        com.mad.techfix.data.SessionManager sessionManager = new com.mad.techfix.data.SessionManager(requireContext());
+        if (!"CUSTOMER".equalsIgnoreCase(sessionManager.getUserRole())) {
+            btnPayment.setVisibility(View.GONE);
+        }
         View btnStatusHistory = view.findViewById(R.id.btn_status_history);
 
         btnPayment.setOnClickListener(v -> {

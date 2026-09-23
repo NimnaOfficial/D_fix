@@ -340,6 +340,11 @@ public class TechnicianRepairDetailFragment
                 view.findViewById(
                         R.id.btn_view_repair_history_technician
                 );
+
+        btnMessages =
+                view.findViewById(
+                        R.id.btn_messages
+                );
     }
 
 
