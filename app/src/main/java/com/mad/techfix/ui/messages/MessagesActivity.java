@@ -76,7 +76,7 @@ public class MessagesActivity extends AppCompatActivity {
         RequestBody requestBody = RequestBody.create(MediaType.parse("image/jpeg"), file);
         MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), requestBody);
 
-        apiService.uploadFile("Bearer " + token, filePart).enqueue(new Callback<Map<String, Object>>() {
+        apiService.uploadFile(token, filePart).enqueue(new Callback<Map<String, Object>>() {
             @Override
             public void onResponse(@NonNull Call<Map<String, Object>> call, @NonNull Response<Map<String, Object>> response) {
                 if (response.isSuccessful() && response.body() != null && Boolean.TRUE.equals(response.body().get("success"))) {
@@ -224,8 +224,8 @@ public class MessagesActivity extends AppCompatActivity {
         
         btnSendMessage.setEnabled(false);
         Map<String, String> body = new HashMap<>();
-        body.put("message", text);
-        if (!imageUrl.isEmpty()) body.put("image_url", imageUrl);
+        body.put("message", text != null ? text : "");
+        body.put("image_url", (imageUrl != null) ? imageUrl : "");
 
         apiService.sendMessage(token, appointmentId, body).enqueue(new Callback<ApiResponse<Object>>() {
             @Override
@@ -235,7 +235,13 @@ public class MessagesActivity extends AppCompatActivity {
                     etMessage.setText("");
                     fetchMessages();
                 } else {
-                    Toast.makeText(MessagesActivity.this, "Failed to send", Toast.LENGTH_SHORT).show();
+                    String err = "Failed to send";
+                    try {
+                        if (response.errorBody() != null) {
+                            err = response.errorBody().string();
+                        }
+                    } catch (Exception ignored) {}
+                    Toast.makeText(MessagesActivity.this, err, Toast.LENGTH_LONG).show();
                 }
             }
             @Override

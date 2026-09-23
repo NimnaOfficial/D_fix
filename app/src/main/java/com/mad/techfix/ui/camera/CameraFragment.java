@@ -404,11 +404,11 @@ public class CameraFragment extends Fragment {
         okhttp3.MultipartBody.Builder builder = new okhttp3.MultipartBody.Builder()
                 .setType(okhttp3.MultipartBody.FORM)
                 .addFormDataPart("file", capturedFile.getName(), requestBody)
-                .addFormDataPart("api_key", data.getApiKey())
+                .addFormDataPart("api_key", data.getApiKey() != null ? data.getApiKey() : "")
                 .addFormDataPart("timestamp", String.valueOf(data.getTimestamp()))
-                .addFormDataPart("signature", data.getSignature())
-                .addFormDataPart("folder", data.getFolder())
-                .addFormDataPart("upload_preset", data.getUploadPreset());
+                .addFormDataPart("signature", data.getSignature() != null ? data.getSignature() : "")
+                .addFormDataPart("folder", data.getFolder() != null ? data.getFolder() : "")
+                .addFormDataPart("upload_preset", data.getUploadPreset() != null ? data.getUploadPreset() : "");
 
         okhttp3.RequestBody cloudinaryBody = builder.build();
         String cloudinaryUrl = "https://api.cloudinary.com/v1_1/" + data.getCloudName() + "/image/upload";
