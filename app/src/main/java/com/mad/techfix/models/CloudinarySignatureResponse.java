@@ -10,11 +10,14 @@ public class CloudinarySignatureResponse {
     public void setData(CloudinaryData data) { this.data = data; }
 
     public static class CloudinaryData {
+        @com.google.gson.annotations.SerializedName("cloud_name")
         private String cloudName;
+        @com.google.gson.annotations.SerializedName("api_key")
         private String apiKey;
         private long timestamp;
         private String signature;
         private String folder;
+        @com.google.gson.annotations.SerializedName("upload_preset")
         private String uploadPreset;
 
         public String getCloudName() { return cloudName; }

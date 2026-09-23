@@ -345,6 +345,7 @@ public class TechnicianRepairDetailFragment
                 view.findViewById(
                         R.id.btn_messages
                 );
+        btnMessages = view.findViewById(R.id.btn_messages);
     }
 
 
