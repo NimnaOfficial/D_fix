@@ -870,6 +870,25 @@ export default {
           problem_description,
         } = await request.json();
 
+        let cLat = parseFloat(customer_latitude);
+        let cLon = parseFloat(customer_longitude);
+
+        // Fallback to Geocoding if GPS location is missing or 0,0
+        if (!cLat || !cLon || (cLat === 0 && cLon === 0) || isNaN(cLat) || isNaN(cLon)) {
+            const custInfo = await env.DB.prepare(`SELECT address, city FROM customers WHERE user_id = ?`).bind(user.id).first();
+            if (custInfo && (custInfo.address || custInfo.city)) {
+                const query = encodeURIComponent(`${custInfo.address || ""} ${custInfo.city || ""}, Sri Lanka`);
+                try {
+                    const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${query}`, { headers: { "User-Agent": "TECHFIX-App/1.0" } });
+                    const geoData = await geoRes.json();
+                    if (geoData && geoData.length > 0) {
+                        cLat = parseFloat(geoData[0].lat);
+                        cLon = parseFloat(geoData[0].lon);
+                    }
+                } catch(e) { console.error("Geocoding fallback failed", e); }
+            }
+        }
+
         // 1. Fetch all active branches and calculate nearest branch using Haversine
         const allBranches = await env.DB.prepare(`SELECT id, latitude, longitude FROM branches WHERE is_active = 1`).all();
         if (!allBranches.results || allBranches.results.length === 0) {
@@ -890,8 +909,8 @@ export default {
         let minDistance = Infinity;
 
         for (const b of allBranches.results) {
-            if (b.latitude != null && b.longitude != null && customer_latitude != null && customer_longitude != null) {
-                const d = calcDistance(customer_latitude, customer_longitude, b.latitude, b.longitude);
+            if (b.latitude != null && b.longitude != null && !isNaN(cLat) && !isNaN(cLon)) {
+                const d = calcDistance(cLat, cLon, b.latitude, b.longitude);
                 if (d < minDistance) {
                     minDistance = d;
                     nearestBranch = b;
@@ -903,27 +922,23 @@ export default {
              nearestBranch = allBranches.results[0]; // fallback
         }
         
-        const branch_id = nearestBranch.id; // Automatically calculate nearest branch instead of using UI request
+        const branch_id = nearestBranch.id;
 
         const service = await env.DB.prepare(
           `SELECT base_price FROM services WHERE id = ?`,
-        )
-          .bind(service_id)
-          .first();
+        ).bind(service_id).first();
+        
         const aptId = await generateUniqueAppointmentId(env);
-        const aptNum =
-          "TF-" +
-          Date.now() +
-          "-" +
-          crypto.randomUUID().split("-")[0].toUpperCase();
+        const aptNum = "TF-" + Date.now() + "-" + crypto.randomUUID().split("-")[0].toUpperCase();
 
-        // 1. Auto-Assignment Logic: Find an available technician at the requested branch who has the required skill
-        const availableTech = await env.DB.prepare(
-          `
-            SELECT t.id FROM technicians t WHERE t.branch_id = ? AND t.availability_status = 'AVAILABLE' LIMIT 1
-        `,
-        )
-          .bind(branch_id).first();
+        // 2. Auto-Assignment Logic: Find an available technician at the requested branch who has the required skill
+        const availableTech = await env.DB.prepare(`
+            SELECT t.id 
+            FROM technicians t 
+            INNER JOIN technician_services ts ON t.id = ts.technician_id
+            WHERE t.branch_id = ? AND ts.service_id = ? AND t.availability_status = "AVAILABLE" 
+            LIMIT 1
+        `).bind(branch_id, service_id).first();
 
         let initialStatus = "REQUESTED";
         let assignedTechId = null;
@@ -933,65 +948,32 @@ export default {
           assignedTechId = availableTech.id;
         }
 
-        await env.DB.prepare(
-          `
+        await env.DB.prepare(`
             INSERT INTO appointments (id, appointment_number, customer_id, device_id, service_id, branch_id, technician_id, requested_date, requested_time, customer_latitude, customer_longitude, problem_description, status, estimated_price)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `,
-        )
-          .bind(
-            aptId,
-            aptNum,
-            user.id,
-            device_id,
-            service_id,
-            branch_id,
-            assignedTechId,
-            requested_date,
-            requested_time || null,
-            customer_latitude || null,
-            customer_longitude || null,
-            problem_description,
-            initialStatus,
-            service?.base_price || 0,
-          )
-          .run();
+        `).bind(
+            aptId, aptNum, user.id, device_id, service_id, branch_id, assignedTechId,
+            requested_date, requested_time || null, cLat || null, cLon || null,
+            problem_description, initialStatus, service ? service.base_price : 0
+        ).run();
 
-        await env.DB.prepare(
-          `INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, ?, ?, ?)`,
-        )
-          .bind(
-            crypto.randomUUID(),
-            aptId,
-            initialStatus,
-            "System " + initialStatus,
-            user.id,
-          )
-          .run();
+        await env.DB.prepare(`
+            INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by)
+            VALUES (?, ?, ?, ?, ?)
+        `).bind(
+            crypto.randomUUID(), aptId, initialStatus,
+            assignedTechId ? "System auto-assigned to skilled technician" : "Appointment requested by customer", user.id
+        ).run();
 
         if (assignedTechId) {
-          // Mark tech as busy
-          await env.DB.prepare(
-            `UPDATE technicians SET availability_status = 'BUSY' WHERE id = ?`,
-          )
-            .bind(assignedTechId)
-            .run();
+          await env.DB.prepare(`UPDATE technicians SET availability_status = "BUSY" WHERE id = ?`).bind(assignedTechId).run();
         }
 
-        return json(
-          {
+        return json({
             success: true,
-            message: assignedTechId
-              ? "Appointment created and auto-assigned"
-              : "Appointment created and added to waiting list",
-            data: {
-              id: aptId,
-              appointment_number: aptNum,
-              technician_id: assignedTechId,
-            },
-          },
-          201,
-        );
+            message: assignedTechId ? "Appointment created and auto-assigned" : "Appointment created and added to waiting list",
+            appointment_id: aptId,
+        });
       }
 
       if (
@@ -3414,4 +3396,6 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
     }
   },
 };
+
+
 

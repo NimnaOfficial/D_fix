@@ -106,22 +106,16 @@ public class CustomerAppointmentAdapter
             String filter
     ) {
 
-        if ("ALL".equals(filter)) {
-            return true;
-        }
-
-        if (appointment == null
-                || appointment.getStatus() == null) {
-
+        if (appointment == null || appointment.getStatus() == null) {
             return false;
         }
 
-        String status =
-                appointment.getStatus()
-                        .trim()
-                        .toUpperCase(
-                                Locale.US
-                        );
+        String status = appointment.getStatus().trim().toUpperCase(Locale.US);
+
+        if ("ALL".equals(filter)) {
+            // Hide cancelled appointments from the "ALL" view by default
+            return !status.equals("CANCELLED");
+        }
 
         if ("IN_PROGRESS".equals(filter)) {
 
