@@ -17,4 +17,8 @@
         android:icon="@drawable/ic_calendar"
         android:title="History" />
 
+    <item
+        android:id="@+id/nav_technician_profile"
+        android:icon="@drawable/ic_person"
+        android:title="Profile" />
 </menu>

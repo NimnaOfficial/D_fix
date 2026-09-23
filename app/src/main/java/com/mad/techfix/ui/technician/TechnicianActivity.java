@@ -69,17 +69,19 @@ public class TechnicianActivity extends AppCompatActivity {
                         return true;
                     }
 
-                    if (itemId ==
-                            R.id.nav_repair_history) {
+                    
+                    if (itemId == R.id.nav_repair_history) {
+                        openFragment(new RepairHistoryFragment());
+                        return true;
+                    }
 
-                        openFragment(
-                                new RepairHistoryFragment()
-                        );
-
+                    if (itemId == R.id.nav_technician_profile) {
+                        openFragment(new TechnicianProfileFragment());
                         return true;
                     }
 
                     return false;
+
                 });
     }
 
