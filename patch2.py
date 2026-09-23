@@ -1,18 +1,11 @@
-import re
-
 with open('cloudflare-backend/worker.js', 'r') as f:
     txt = f.read()
 
-old_block = r'''        if \(status === "PAID"\) {
-          await env\.DB\.prepare\(
-            INSERT INTO notifications \(id, user_id, appointment_id, title, message, notification_type, is_read\) VALUES \(\?, \?, \?, 'Payment Received', 
-'Payment confirmed\.', 'PAYMENT', 0\),\s*
-          \)
-            \.bind\(crypto\.randomUUID\(\), existing\.customer_id, existing\.apt_id\)
-            \.run\(\);
-        }'''
+import re
 
-new_block = '''        if (status === "PAID") {
+search_pattern = r'if \(status === "PAID"\) \{\s*await env\.DB\.prepare\(\s*INSERT INTO notifications \(id, user_id, appointment_id, title, message, notification_type, is_read\) VALUES \(\?, \?, \?, \'Payment Received\',\s*\'Payment confirmed\.\', \'PAYMENT\', 0\),\s*\)\s*\.bind\(crypto\.randomUUID\(\), existing\.customer_id, existing\.apt_id\)\s*\.run\(\);\s*\}'
+
+new_block = '''if (status === "PAID") {
           await env.DB.prepare(
             INSERT INTO notifications (id, user_id, appointment_id, title, message, notification_type, is_read) VALUES (?, ?, ?, 'Payment Received', 'Payment confirmed.', 'PAYMENT', 0)
           ).bind(crypto.randomUUID(), existing.customer_id, existing.apt_id).run();
@@ -38,7 +31,10 @@ new_block = '''        if (status === "PAID") {
           }
         }'''
 
-txt = re.sub(old_block.replace('\n', r'\r?\n'), new_block, txt, flags=re.MULTILINE)
-
-with open('cloudflare-backend/worker.js', 'w') as f:
-    f.write(txt)
+if re.search(search_pattern, txt):
+    txt = re.sub(search_pattern, new_block, txt)
+    with open('cloudflare-backend/worker.js', 'w') as f:
+        f.write(txt)
+    print("Success")
+else:
+    print("Failed to find pattern")
