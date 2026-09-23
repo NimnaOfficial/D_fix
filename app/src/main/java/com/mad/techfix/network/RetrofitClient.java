@@ -7,7 +7,7 @@ import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 
 public class RetrofitClient {
-    private static final String BASE_URL = "https://techfix-api.codse251f-003.workers.dev/";
+    private static final String BASE_URL = "https://techfix-backend.codse251f-003.workers.dev/";
     private static Retrofit retrofit = null;
 
     public static Retrofit getClient() {
