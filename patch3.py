@@ -1,18 +1,11 @@
 import re
-
 with open('cloudflare-backend/worker.js', 'r') as f:
     txt = f.read()
 
-old_block = r'''        if \(status === "PAID"\) {
-          await env\.DB\.prepare\(
-            INSERT INTO notifications \(id, user_id, appointment_id, title, message, notification_type, is_read\) VALUES \(\?, \?, \?, 'Payment Received', 
-'Payment confirmed\.', 'PAYMENT', 0\),\s*
-          \)
-            \.bind\(crypto\.randomUUID\(\), existing\.customer_id, existing\.apt_id\)
-            \.run\(\);
-        }'''
+search = r'if \(status === "PAID"\) \{[\s\S]*?\.run\(\);\s*\}'
+matches = re.findall(search, txt)
 
-new_block = '''        if (status === "PAID") {
+new_block = '''if (status === "PAID") {
           await env.DB.prepare(
             INSERT INTO notifications (id, user_id, appointment_id, title, message, notification_type, is_read) VALUES (?, ?, ?, 'Payment Received', 'Payment confirmed.', 'PAYMENT', 0)
           ).bind(crypto.randomUUID(), existing.customer_id, existing.apt_id).run();
@@ -38,7 +31,10 @@ new_block = '''        if (status === "PAID") {
           }
         }'''
 
-txt = re.sub(old_block.replace('\n', r'\r?\n'), new_block, txt, flags=re.MULTILINE)
-
-with open('cloudflare-backend/worker.js', 'w') as f:
-    f.write(txt)
+if matches:
+    txt = txt.replace(matches[0], new_block)
+    with open('cloudflare-backend/worker.js', 'w') as f:
+        f.write(txt)
+    print("Replaced!")
+else:
+    print("Not found")
