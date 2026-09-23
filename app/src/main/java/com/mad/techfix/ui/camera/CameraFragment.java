@@ -293,6 +293,18 @@ public class CameraFragment extends Fragment {
                         .build();
 
                 CameraSelector cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                try {
+                    if (cameraProvider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                        cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA;
+                    } else if (cameraProvider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)) {
+                        cameraSelector = CameraSelector.DEFAULT_FRONT_CAMERA;
+                    } else {
+                        Toast.makeText(getContext(), "No camera available", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } catch (Exception e) {
+                    cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA; // fallback
+                }
                 cameraProvider.unbindAll();
                 cameraProvider.bindToLifecycle(getViewLifecycleOwner(), cameraSelector, preview, imageCapture);
 
@@ -327,6 +339,16 @@ public class CameraFragment extends Fragment {
                 Toast.makeText(getContext(), "📸 Photo captured", Toast.LENGTH_SHORT).show();
                 Log.d(TAG, "📸 Photo saved to: " + capturedFile.getAbsolutePath());
                 
+                if (getArguments() != null && getArguments().getBoolean("return_url_only", false)) {
+                    requireActivity().runOnUiThread(() -> {
+                        android.os.Bundle result = new android.os.Bundle();
+                        result.putString("local_file_path", capturedFile.getAbsolutePath());
+                        getParentFragmentManager().setFragmentResult("camera_request", result);
+                        getParentFragmentManager().popBackStack();
+                    });
+                    return;
+                }
+
                 // Show preview in UI immediately
                 if (isUiAvailable()) {
                     requireActivity().runOnUiThread(() -> {
@@ -369,102 +391,48 @@ public class CameraFragment extends Fragment {
             return;
         }
 
+        if (getArguments() != null && getArguments().getBoolean("return_url_only", false)) {
+            android.os.Bundle result = new android.os.Bundle();
+            result.putString("local_file_path", capturedFile.getAbsolutePath());
+            getParentFragmentManager().setFragmentResult("camera_request", result);
+            getParentFragmentManager().popBackStack();
+            return;
+        }
+
         btnUpload.setEnabled(false);
         progressBar.setVisibility(View.VISIBLE);
 
-        apiService.getCloudinarySignature("Bearer " + token).enqueue(new retrofit2.Callback<CloudinarySignatureResponse>() {
+        okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(okhttp3.MediaType.parse("image/jpeg"), capturedFile);
+        okhttp3.MultipartBody.Part filePart = okhttp3.MultipartBody.Part.createFormData("file", capturedFile.getName(), requestBody);
+
+        apiService.uploadFile("Bearer " + token, filePart).enqueue(new retrofit2.Callback<java.util.Map<String, Object>>() {
             @Override
-            public void onResponse(@NonNull retrofit2.Call<CloudinarySignatureResponse> call, @NonNull retrofit2.Response<CloudinarySignatureResponse> response) {
+            public void onResponse(@NonNull retrofit2.Call<java.util.Map<String, Object>> call, @NonNull retrofit2.Response<java.util.Map<String, Object>> response) {
                 if (!isUiAvailable()) return;
                 
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    CloudinarySignatureResponse.CloudinaryData data = response.body().getData();
-                    uploadToCloudinary(data, appointmentId);
+                if (response.isSuccessful() && response.body() != null && Boolean.TRUE.equals(response.body().get("success"))) {
+                    String url = (String) response.body().get("url");
+                    if (getArguments() != null && getArguments().getBoolean("return_url_only", false)) {
+                        android.os.Bundle result = new android.os.Bundle();
+                        result.putString("image_url", url);
+                        getParentFragmentManager().setFragmentResult("camera_request", result);
+                        getParentFragmentManager().popBackStack();
+                        return;
+                    }
+                    saveImageUrlToBackend(appointmentId, url);
                 } else {
                     progressBar.setVisibility(View.GONE);
                     btnUpload.setEnabled(true);
-                    Toast.makeText(getContext(), "Failed to get upload signature", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Image upload failed", Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
-            public void onFailure(@NonNull retrofit2.Call<CloudinarySignatureResponse> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull retrofit2.Call<java.util.Map<String, Object>> call, @NonNull Throwable t) {
                 if (!isUiAvailable()) return;
                 progressBar.setVisibility(View.GONE);
                 btnUpload.setEnabled(true);
                 Toast.makeText(getContext(), "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void uploadToCloudinary(CloudinarySignatureResponse.CloudinaryData data, String appointmentId) {
-        okhttp3.MediaType MEDIA_TYPE_JPG = okhttp3.MediaType.parse("image/jpeg");
-        okhttp3.RequestBody requestBody = okhttp3.RequestBody.create(MEDIA_TYPE_JPG, capturedFile);
-
-        okhttp3.MultipartBody.Builder builder = new okhttp3.MultipartBody.Builder()
-                .setType(okhttp3.MultipartBody.FORM)
-                .addFormDataPart("file", capturedFile.getName(), requestBody)
-                .addFormDataPart("api_key", data.getApiKey() != null ? data.getApiKey() : "")
-                .addFormDataPart("timestamp", String.valueOf(data.getTimestamp()))
-                .addFormDataPart("signature", data.getSignature() != null ? data.getSignature() : "")
-                .addFormDataPart("folder", data.getFolder() != null ? data.getFolder() : "")
-                .addFormDataPart("upload_preset", data.getUploadPreset() != null ? data.getUploadPreset() : "");
-
-        okhttp3.RequestBody cloudinaryBody = builder.build();
-        String cloudinaryUrl = "https://api.cloudinary.com/v1_1/" + data.getCloudName() + "/image/upload";
-
-        okhttp3.Request cloudinaryRequest = new okhttp3.Request.Builder()
-                .url(cloudinaryUrl)
-                .post(cloudinaryBody)
-                .build();
-
-        okHttpClient.newCall(cloudinaryRequest).enqueue(new okhttp3.Callback() {
-            @Override
-            public void onResponse(@NonNull okhttp3.Call call, @NonNull okhttp3.Response response) throws java.io.IOException {
-                if (response.isSuccessful() && response.body() != null) {
-                    String jsonResponse = response.body().string();
-                    try {
-                        org.json.JSONObject jsonObject = new org.json.JSONObject(jsonResponse);
-                        String secureUrl = jsonObject.getString("secure_url");
-
-                        if (!isUiAvailable()) return;
-                        requireActivity().runOnUiThread(() -> {
-                            if (getArguments() != null && getArguments().getBoolean("return_url_only", false)) {
-                                android.os.Bundle result = new android.os.Bundle();
-                                result.putString("image_url", secureUrl);
-                                getParentFragmentManager().setFragmentResult("camera_request", result);
-                                getParentFragmentManager().popBackStack();
-                                return;
-                            }
-                            saveImageUrlToBackend(appointmentId, secureUrl);
-                        });
-
-                    } catch (org.json.JSONException e) {
-                        if (!isUiAvailable()) return;
-                        requireActivity().runOnUiThread(() -> {
-                            Toast.makeText(getContext(), "Failed to parse Cloudinary response", Toast.LENGTH_SHORT).show();
-                            progressBar.setVisibility(View.GONE);
-                            btnUpload.setEnabled(true);
-                        });
-                    }
-                } else {
-                    if (!isUiAvailable()) return;
-                    requireActivity().runOnUiThread(() -> {
-                        Toast.makeText(getContext(), "Cloudinary upload failed", Toast.LENGTH_SHORT).show();
-                        progressBar.setVisibility(View.GONE);
-                        btnUpload.setEnabled(true);
-                    });
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull okhttp3.Call call, @NonNull java.io.IOException e) {
-                if (!isUiAvailable()) return;
-                requireActivity().runOnUiThread(() -> {
-                    Toast.makeText(getContext(), "Cloudinary error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    progressBar.setVisibility(View.GONE);
-                    btnUpload.setEnabled(true);
-                });
             }
         });
     }

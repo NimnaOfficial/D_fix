@@ -1296,7 +1296,7 @@ export default {
         }
       }
 
-      // -- UPLOAD (R2) --
+      // -- UPLOAD (ImgBB) --
       if (path === "/api/upload" && request.method === "POST") {
         const user = await authenticate(request, env);
         if (!user) return json({ success: false, message: "Unauthorized" }, 401);
@@ -1305,20 +1305,24 @@ export default {
             const formData = await request.formData();
             const file = formData.get("file");
             if (!file) return json({ success: false, message: "No file provided" }, 400);
-            
-            const ext = file.name ? file.name.split('.').pop() : 'jpg';
-            const key = `uploads/${crypto.randomUUID()}.${ext}`;
-            
-            if (!env.BUCKET) return json({ success: false, message: "R2 Bucket not configured" }, 500);
 
-            await env.BUCKET.put(key, file.stream(), {
-              httpMetadata: { contentType: file.type || 'image/jpeg' }
+            // Using ImgBB as free cloud storage to bypass disabled R2 buckets
+            const imgbbData = new FormData();
+            imgbbData.append("key", "4b5b7cb36b2255745129c54e0c1f2115");
+            imgbbData.append("image", file);
+
+            const imgResponse = await fetch("https://api.imgbb.com/1/upload", {
+                method: "POST",
+                body: imgbbData
             });
             
-            // Return full url based on current request host
-            const hostUrl = new URL(request.url).origin;
-            const url = `${hostUrl}/api/images/${key}`;
-            return json({ success: true, url });
+            const imgbbResult = await imgResponse.json();
+            
+            if (imgbbResult.success && imgbbResult.data && imgbbResult.data.url) {
+                return json({ success: true, url: imgbbResult.data.url });
+            } else {
+                return json({ success: false, message: "Image upload failed" }, 500);
+            }
         } catch(err) {
             return json({ success: false, message: err.message }, 500);
         }

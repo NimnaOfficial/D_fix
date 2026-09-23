@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "157547296829",
+    "project_id": "madproj-f84e3",
+    "storage_bucket": "madproj-f84e3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:157547296829:android:e542fca2e790bb81dd5254",
+        "android_client_info": {
+          "package_name": "com.mad.techfix"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_Fy4WJZWVu2WEahxXE-86Vj3gspf2g6o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

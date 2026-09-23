@@ -1,5 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
+    
     // No hardcoded version here – uses the version from libs.versions.toml
 }
 
@@ -32,6 +33,12 @@ android {
 }
 
 dependencies {
+    // Firebase
+    implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+
     // Core Android
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")

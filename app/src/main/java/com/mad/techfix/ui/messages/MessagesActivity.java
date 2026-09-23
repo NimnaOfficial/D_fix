@@ -1,39 +1,40 @@
 package com.mad.techfix.ui.messages;
 
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.Log;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Toast;
-import androidx.annotation.NonNull;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.cloudinary.android.MediaManager;
+import com.cloudinary.android.callback.ErrorInfo;
+import com.cloudinary.android.callback.UploadCallback;
 import com.mad.techfix.R;
-import com.mad.techfix.network.RetrofitClient;
-import com.mad.techfix.data.SessionManager;
 import com.mad.techfix.models.ApiResponse;
+import com.mad.techfix.data.SessionManager;
 import com.mad.techfix.models.Message;
 import com.mad.techfix.network.ApiService;
+import com.mad.techfix.network.RetrofitClient;
+
+import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
-import android.os.Handler;
-import android.os.Looper;
-import android.content.Intent;
-import android.net.Uri;
-import android.provider.MediaStore;
-import android.database.Cursor;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
-import java.io.File;
-import okhttp3.MediaType;
-import okhttp3.MultipartBody;
-import okhttp3.RequestBody;
-
 
 public class MessagesActivity extends AppCompatActivity {
 
@@ -43,56 +44,13 @@ public class MessagesActivity extends AppCompatActivity {
     private ImageButton btnSendImage;
     private MessageAdapter adapter;
     private String appointmentId;
-    private ApiService apiService;
     private SessionManager sessionManager;
-    private Handler handler;
-    private Runnable fetchRunnable;
+    private ApiService apiService;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
-    private File getFileFromUri(Uri uri) {
-        try {
-            java.io.InputStream inputStream = getContentResolver().openInputStream(uri);
-            if (inputStream == null) return null;
-            File tempFile = File.createTempFile("upload_", ".jpg", getCacheDir());
-            java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile);
-            byte[] buffer = new byte[1024];
-            int read;
-            while ((read = inputStream.read(buffer)) != -1) {
-                out.write(buffer, 0, read);
-            }
-            out.close();
-            inputStream.close();
-            return tempFile;
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    private void uploadImage(File file) {
-        String token = sessionManager.getBearerToken();
-        if (token == null) return;
-        Toast.makeText(this, "Uploading image...", Toast.LENGTH_SHORT).show();
-        
-        RequestBody requestBody = RequestBody.create(MediaType.parse("image/jpeg"), file);
-        MultipartBody.Part filePart = MultipartBody.Part.createFormData("file", file.getName(), requestBody);
-
-        apiService.uploadFile(token, filePart).enqueue(new Callback<Map<String, Object>>() {
-            @Override
-            public void onResponse(@NonNull Call<Map<String, Object>> call, @NonNull Response<Map<String, Object>> response) {
-                if (response.isSuccessful() && response.body() != null && Boolean.TRUE.equals(response.body().get("success"))) {
-                    String url = (String) response.body().get("url");
-                    sendMessage("Sent an image", url);
-                } else {
-                    Toast.makeText(MessagesActivity.this, "Image upload failed", Toast.LENGTH_SHORT).show();
-                }
-            }
-            @Override
-            public void onFailure(@NonNull Call<Map<String, Object>> call, @NonNull Throwable t) {
-                Toast.makeText(MessagesActivity.this, "Upload error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
+    
+    private Handler pollingHandler;
+    private Runnable pollingRunnable;
+    private static final int POLL_INTERVAL = 3000;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -121,11 +79,14 @@ public class MessagesActivity extends AppCompatActivity {
         btnSendMessage = findViewById(R.id.btn_send_message);
         btnSendImage = findViewById(R.id.btn_send_image);
 
-        // Get current user id from session if stored, else we can pass it via intent
-        // For now, let's assume sessionManager doesn't expose it directly, but wait!
         String userId = sessionManager.getUserId();
 
-        
+        adapter = new MessageAdapter(userId);
+        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
+        layoutManager.setStackFromEnd(true);
+        recyclerMessages.setLayoutManager(layoutManager);
+        recyclerMessages.setAdapter(adapter);
+
         imagePickerLauncher = registerForActivityResult(
                 new ActivityResultContracts.StartActivityForResult(),
                 result -> {
@@ -134,7 +95,7 @@ public class MessagesActivity extends AppCompatActivity {
                         if (imageUri != null) {
                             File file = getFileFromUri(imageUri);
                             if (file != null && file.exists()) {
-                                uploadImage(file);
+                                uploadImageToCloudinary(file);
                             } else {
                                 Toast.makeText(this, "Could not read image", Toast.LENGTH_SHORT).show();
                             }
@@ -143,112 +104,159 @@ public class MessagesActivity extends AppCompatActivity {
                 }
         );
 
-        adapter = new MessageAdapter(userId);
-        LinearLayoutManager layoutManager = new LinearLayoutManager(this);
-        layoutManager.setStackFromEnd(true);
-        recyclerMessages.setLayoutManager(layoutManager);
-        recyclerMessages.setAdapter(adapter);
-
         btnSendMessage.setOnClickListener(v -> {
             String text = etMessage.getText().toString().trim();
             if (!text.isEmpty()) {
                 sendMessage(text, "");
+                etMessage.setText("");
             }
         });
-        
+
         btnSendImage.setOnClickListener(v -> {
-            com.mad.techfix.ui.camera.CameraFragment cameraFragment = new com.mad.techfix.ui.camera.CameraFragment();
-            android.os.Bundle args = new android.os.Bundle();
-            args.putString("appointment_id", appointmentId);
-            args.putBoolean("return_url_only", true);
-            cameraFragment.setArguments(args);
-            getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, cameraFragment)
-                    .addToBackStack(null)
-                    .commit();
+            CharSequence[] options = {"Take Photo", "Choose from Gallery", "Cancel"};
+            new android.app.AlertDialog.Builder(this)
+                .setTitle("Send Image")
+                .setItems(options, (dialog, which) -> {
+                    if (which == 0) {
+                        com.mad.techfix.ui.camera.CameraFragment cameraFragment = new com.mad.techfix.ui.camera.CameraFragment();
+                        Bundle args = new Bundle();
+                        args.putString("appointment_id", appointmentId);
+                        args.putBoolean("return_url_only", true);
+                        cameraFragment.setArguments(args);
+                        getSupportFragmentManager().beginTransaction()
+                                .replace(R.id.fragment_container, cameraFragment)
+                                .addToBackStack(null)
+                                .commit();
+                    } else if (which == 1) {
+                        Intent intent = new Intent(Intent.ACTION_PICK, android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+                        imagePickerLauncher.launch(intent);
+                    }
+                })
+                .show();
         });
 
         getSupportFragmentManager().setFragmentResultListener("camera_request", this, (requestKey, bundle) -> {
-            String imageUrl = bundle.getString("image_url");
-            if (imageUrl != null && !imageUrl.isEmpty()) {
-                sendMessage("Sent an image", imageUrl);
+            String localPath = bundle.getString("local_file_path");
+            if (localPath != null && !localPath.isEmpty()) {
+                File file = new File(localPath);
+                if (file.exists()) {
+                    uploadImageToCloudinary(file);
+                } else {
+                    Toast.makeText(this, "File not found", Toast.LENGTH_SHORT).show();
+                }
+            } else {
+                String imageUrl = bundle.getString("image_url");
+                if (imageUrl != null && !imageUrl.isEmpty()) {
+                    sendMessage("Sent an image", imageUrl);
+                }
             }
         });
 
-        handler = new Handler(Looper.getMainLooper());
-        fetchRunnable = new Runnable() {
+        pollingHandler = new Handler(Looper.getMainLooper());
+        pollingRunnable = new Runnable() {
             @Override
             public void run() {
-                fetchMessages();
-                handler.postDelayed(this, 5000);
+                loadMessages();
+                pollingHandler.postDelayed(this, POLL_INTERVAL);
             }
         };
+        pollingHandler.post(pollingRunnable);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        handler.post(fetchRunnable);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        handler.removeCallbacks(fetchRunnable);
-    }
-
-    private void fetchMessages() {
-        String token = sessionManager.getBearerToken();
-        if (token == null) return;
-
-        apiService.getMessages(token, appointmentId).enqueue(new Callback<ApiResponse<List<Message>>>() {
+    private void loadMessages() {
+        apiService.getMessages(sessionManager.getBearerToken(), appointmentId).enqueue(new Callback<ApiResponse<List<Message>>>() {
             @Override
-            public void onResponse(@NonNull Call<ApiResponse<List<Message>>> call, @NonNull Response<ApiResponse<List<Message>>> response) {
+            public void onResponse(Call<ApiResponse<List<Message>>> call, Response<ApiResponse<List<Message>>> response) {
                 if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
                     List<Message> msgs = response.body().getData();
-                    if (msgs != null) {
-                        adapter.setMessages(msgs);
-                        recyclerMessages.scrollToPosition(msgs.size() - 1);
+                    int previousSize = adapter.getItemCount();
+                    adapter.setMessages(msgs);
+                    if (msgs.size() > previousSize && msgs.size() > 0) {
+                        recyclerMessages.smoothScrollToPosition(msgs.size() - 1);
                     }
                 }
             }
             @Override
-            public void onFailure(@NonNull Call<ApiResponse<List<Message>>> call, @NonNull Throwable t) {
+            public void onFailure(Call<ApiResponse<List<Message>>> call, Throwable t) {
+                Log.e("MessagesActivity", "Failed to load messages", t);
             }
         });
     }
 
     private void sendMessage(String text, String imageUrl) {
-        String token = sessionManager.getBearerToken();
-        if (token == null) return;
-        
-        btnSendMessage.setEnabled(false);
         Map<String, String> body = new HashMap<>();
-        body.put("message", text != null ? text : "");
-        body.put("image_url", (imageUrl != null) ? imageUrl : "");
+        body.put("message", text);
+        if (imageUrl != null && !imageUrl.isEmpty()) {
+            body.put("image_url", imageUrl);
+        }
 
-        apiService.sendMessage(token, appointmentId, body).enqueue(new Callback<ApiResponse<Object>>() {
+        apiService.sendMessage(sessionManager.getBearerToken(), appointmentId, body).enqueue(new Callback<ApiResponse<Object>>() {
             @Override
-            public void onResponse(@NonNull Call<ApiResponse<Object>> call, @NonNull Response<ApiResponse<Object>> response) {
-                btnSendMessage.setEnabled(true);
-                if (response.isSuccessful() && response.body() != null && response.body().isSuccess()) {
-                    etMessage.setText("");
-                    fetchMessages();
+            public void onResponse(Call<ApiResponse<Object>> call, Response<ApiResponse<Object>> response) {
+                if (response.isSuccessful()) {
+                    loadMessages();
                 } else {
-                    String err = "Failed to send";
-                    try {
-                        if (response.errorBody() != null) {
-                            err = response.errorBody().string();
-                        }
-                    } catch (Exception ignored) {}
-                    Toast.makeText(MessagesActivity.this, err, Toast.LENGTH_LONG).show();
+                    Toast.makeText(MessagesActivity.this, "Failed to send message", Toast.LENGTH_SHORT).show();
                 }
             }
             @Override
-            public void onFailure(@NonNull Call<ApiResponse<Object>> call, @NonNull Throwable t) {
-                btnSendMessage.setEnabled(true);
-                Toast.makeText(MessagesActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            public void onFailure(Call<ApiResponse<Object>> call, Throwable t) {
+                Toast.makeText(MessagesActivity.this, "Network error", Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private void uploadImageToCloudinary(File file) {
+        Toast.makeText(this, "Uploading image to Cloudinary...", Toast.LENGTH_SHORT).show();
+        
+        MediaManager.get().upload(file.getAbsolutePath())
+                .callback(new UploadCallback() {
+                    @Override
+                    public void onStart(String requestId) {
+                        Log.d("Cloudinary", "Upload started: " + requestId);
+                    }
+                    @Override
+                    public void onProgress(String requestId, long bytes, long totalBytes) {}
+                    @Override
+                    public void onSuccess(String requestId, Map resultData) {
+                        String url = (String) resultData.get("secure_url");
+                        sendMessage("📸 Image", url);
+                    }
+                    @Override
+                    public void onError(String requestId, ErrorInfo error) {
+                        Log.e("Cloudinary", "Upload failed: " + error.getDescription());
+                        Toast.makeText(MessagesActivity.this, "Upload failed: " + error.getDescription(), Toast.LENGTH_SHORT).show();
+                    }
+                    @Override
+                    public void onReschedule(String requestId, ErrorInfo error) {}
+                }).dispatch();
+    }
+
+    private File getFileFromUri(Uri uri) {
+        try {
+            java.io.InputStream inputStream = getContentResolver().openInputStream(uri);
+            if (inputStream == null) return null;
+            File tempFile = File.createTempFile("upload_", ".jpg", getCacheDir());
+            java.io.FileOutputStream out = new java.io.FileOutputStream(tempFile);
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = inputStream.read(buffer)) != -1) {
+                out.write(buffer, 0, read);
+            }
+            out.close();
+            inputStream.close();
+            return tempFile;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (pollingHandler != null && pollingRunnable != null) {
+            pollingHandler.removeCallbacks(pollingRunnable);
+        }
     }
 }
