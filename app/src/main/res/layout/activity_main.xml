@@ -327,7 +327,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:fontFamily="sans-serif"
-                    android:text="Checking connectivity to techfix-api.codse251f-003.workers.dev..."
+                    android:text="Checking connectivity to techfix-backend.codse251f-003.workers.dev..."
                     android:textColor="@color/app_text_secondary"
                     android:textSize="13sp" />
 
