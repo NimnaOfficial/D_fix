@@ -526,16 +526,7 @@ public class RepairBookingFragment extends Fragment {
         }
 
 
-        if (false) {
-
-            Toast.makeText(
-                    requireContext(),
-                    "Please select a branch",
-                    Toast.LENGTH_SHORT
-            ).show();
-
-            return false;
-        }
+        
 
 
         return true;
