@@ -1894,6 +1894,11 @@ if (
                   }
               }
           }
+        } else {
+                      await env.DB.prepare(UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?).bind(aptDetails.technician_id).run();
+                  }
+              }
+          }
         }
 
         return json({ success: true, message: "Payment updated" });
