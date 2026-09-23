@@ -194,7 +194,15 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
         com.google.android.material.button.MaterialButton btnClose = view.findViewById(R.id.btn_close_details);
 
         tvName.setText(user.getFirstName() + " " + user.getLastName());
-        tvId.setText("ID: " + user.getId());
+        tvId.setText("ID: " + user.getId() + " (Tap to copy)");
+        
+        tvId.setOnClickListener(v -> {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE);
+            android.content.ClipData clip = android.content.ClipData.newPlainText("User ID", user.getId());
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(getContext(), "User ID Copied: " + user.getId(), Toast.LENGTH_SHORT).show();
+        });
+
         tvEmail.setText(user.getEmail());
         tvPhone.setText(user.getPhone() != null && !user.getPhone().isEmpty() ? user.getPhone() : "No phone provided");
 

@@ -46,7 +46,12 @@
                 android:text="ID: 12345"
                 android:textSize="12sp"
                 android:fontFamily="monospace"
-                android:textColor="?android:attr/textColorSecondary" />
+                android:textColor="?attr/colorPrimary"
+                android:textIsSelectable="true"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground"
+                android:paddingVertical="4dp" />
         </LinearLayout>
     </LinearLayout>
 
