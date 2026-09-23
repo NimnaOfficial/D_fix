@@ -920,14 +920,10 @@ export default {
         // 1. Auto-Assignment Logic: Find an available technician at the requested branch who has the required skill
         const availableTech = await env.DB.prepare(
           `
-            SELECT t.id FROM technicians t
-            INNER JOIN technician_services ts ON ts.technician_id = t.id
-            WHERE t.branch_id = ? AND t.availability_status = 'AVAILABLE' AND ts.service_id = ?
-            LIMIT 1
+            SELECT t.id FROM technicians t WHERE t.branch_id = ? AND t.availability_status = 'AVAILABLE' LIMIT 1
         `,
         )
-          .bind(branch_id, service_id)
-          .first();
+          .bind(branch_id).first();
 
         let initialStatus = "REQUESTED";
         let assignedTechId = null;
@@ -3204,17 +3200,33 @@ if (path === "/api/cloudinary/signature" && request.method === "GET") {
         const aptId = path.split("/")[3];
         
         // Verify ownership for customer
+        const apt = await env.DB.prepare(`SELECT id, status, customer_id, technician_id, branch_id FROM appointments WHERE id = ?`).bind(aptId).first();
+        if (!apt) return json({ success: false, message: "Appointment not found" }, 404);
+
         if (user.role === "CUSTOMER") {
-          const apt = await env.DB.prepare(`SELECT id, status, customer_id FROM appointments WHERE id = ?`).bind(aptId).first();
-          if (!apt) return json({ success: false, message: "Appointment not found" }, 404);
           if (apt.customer_id !== user.id) return json({ success: false, message: "Access denied" }, 403);
-          if (apt.status !== "REQUESTED") return json({ success: false, message: "Only REQUESTED appointments can be cancelled" }, 400);
+          if (apt.status !== "REQUESTED" && apt.status !== "ASSIGNED") return json({ success: false, message: "Only REQUESTED or ASSIGNED appointments can be cancelled" }, 400);
         }
         
         await env.DB.batch([
             env.DB.prepare(`UPDATE appointments SET status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(aptId),
-            env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, ?, ?, ?)`).bind(crypto.randomUUID(), aptId, 'CANCELLED', 'Cancelled by user', user.id)
+            env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'CANCELLED', 'Cancelled by user', ?)`).bind(crypto.randomUUID(), aptId, user.id)
         ]);
+        
+        // If technician was assigned, handle freeing them up
+        if (apt.technician_id && (apt.status === "REQUESTED" || apt.status === "ASSIGNED")) {
+            // Find next waiting appointment for this branch
+            const pendingApt = await env.DB.prepare(
+              `SELECT a.id FROM appointments a WHERE a.status = 'REQUESTED' AND a.branch_id = ? AND a.technician_id IS NULL ORDER BY a.created_at ASC LIMIT 1`
+            ).bind(apt.branch_id).first();
+
+            if (pendingApt) {
+              await env.DB.prepare(`UPDATE appointments SET technician_id = ?, status = 'ASSIGNED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).bind(apt.technician_id, pendingApt.id).run();
+              await env.DB.prepare(`INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'ASSIGNED', 'System auto-assigned to freed technician', ?)`).bind(crypto.randomUUID(), pendingApt.id, user.id).run();
+            } else {
+              await env.DB.prepare(`UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?`).bind(apt.technician_id).run();
+            }
+        }
         
         return json({ success: true, message: "Appointment cancelled" });
       }

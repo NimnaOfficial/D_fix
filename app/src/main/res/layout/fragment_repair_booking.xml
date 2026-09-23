@@ -163,27 +163,6 @@
         </com.google.android.material.textfield.TextInputLayout>
 
 
-        <!-- Branch Section -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="30dp"
-            android:text="3. Select Branch"
-            android:textColor="@color/app_text_primary"
-            android:textSize="19sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Choose the TECHFIX branch for your repair"
-            android:textColor="@color/app_text_secondary"
-            android:textSize="13sp" />
-
-        
-
-
         <!-- Selected Summary -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
