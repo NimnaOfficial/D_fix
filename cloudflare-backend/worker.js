@@ -385,7 +385,7 @@ export default {
           );
 
         const user = await env.DB.prepare(
-          `SELECT u.*, c.city, c.address, c.loyalty_points FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE u.email = ? LIMIT 1`,
+          `SELECT u.*, c.city, c.address, c.loyalty_points FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE LOWER(u.email) = ? LIMIT 1`,
         )
           .bind(email.trim().toLowerCase())
           .first();
@@ -480,7 +480,7 @@ export default {
         if (!user)
           return json({ success: false, message: "Unauthorized" }, 401);
 
-        const { first_name, last_name, phone, city, address } = await request.json();
+        const { first_name, last_name, phone, city, address, specialization } = await request.json();
         if (!first_name || !last_name || !phone)
           return json({ success: false, message: "First name, last name, and phone are required" }, 400);
 
@@ -499,8 +499,12 @@ export default {
             }
         }
         
+        if (user.role === 'TECHNICIAN' && typeof specialization !== 'undefined') {
+            await env.DB.prepare(`UPDATE technicians SET specialization = ? WHERE user_id = ?`).bind(specialization.trim(), user.id).run();
+        }
+
         const updatedUser = await env.DB.prepare(
-          `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.profile_image_url, c.city, c.address FROM users u LEFT JOIN customers c ON u.id = c.user_id WHERE u.id = ? LIMIT 1`,
+          `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.profile_image_url, c.city, c.address, t.specialization FROM users u LEFT JOIN customers c ON u.id = c.user_id LEFT JOIN technicians t ON u.id = t.user_id WHERE u.id = ? LIMIT 1`,
         )
           .bind(user.id)
           .first();
@@ -2756,7 +2760,7 @@ if (
               last_name || "Name",
               dummyEmail,
               "000000000",
-              "dummy",
+              "techfix_salt_2026:b9e1244ea8003c211197d420f836cb13ca6deb0d48c46f9a391049d389666150",
               "TECHNICIAN",
               1,
             )
@@ -2782,7 +2786,7 @@ if (
                 last_name || "Name",
                 dummyEmail,
                 "000000000",
-                "dummy",
+                "techfix_salt_2026:b9e1244ea8003c211197d420f836cb13ca6deb0d48c46f9a391049d389666150",
                 "TECHNICIAN",
                 1,
               )

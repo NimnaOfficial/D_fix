@@ -197,6 +197,14 @@ public class LoginActivity extends AppCompatActivity {
                         String userRole = user.getRole();
                         if (userRole == null) userRole = "CUSTOMER"; // Fallback
                         
+                        if ("TECHNICIAN".equalsIgnoreCase(userRole) && password.equals("TechFix123!")) {
+                            intent = new Intent(LoginActivity.this, ForcePasswordChangeActivity.class);
+                            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            startActivity(intent);
+                            finish();
+                            return;
+                        }
+                        
                         if ("ADMIN".equalsIgnoreCase(userRole)) {
                             intent = new Intent(LoginActivity.this, com.mad.techfix.ui.admin.SystemAdminActivity.class);
                         } else if ("MANAGER".equalsIgnoreCase(userRole)) {

@@ -75,6 +75,7 @@
             android:theme="@style/Theme.TECHFIX" />
 
             <activity android:name=".ui.messages.MessagesActivity" android:exported="false" />
+        <activity android:name=".ui.auth.ForcePasswordChangeActivity" android:exported="false" android:theme="@style/Theme.TECHFIX" />
     </application>
 
 </manifest>
