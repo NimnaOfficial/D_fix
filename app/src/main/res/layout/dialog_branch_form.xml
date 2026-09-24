@@ -110,7 +110,7 @@
 
             <com.google.android.material.textfield.TextInputLayout
                 android:id="@+id/til_manager_id"
-                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="16dp"
@@ -120,13 +120,13 @@
                 app:hintTextColor="?attr/colorPrimary"
                 app:startIconDrawable="@android:drawable/ic_menu_info_details"
                 app:startIconTint="?attr/colorPrimary"
-                android:hint="Manager ID (Optional)">
-                <com.google.android.material.textfield.TextInputEditText
+                android:hint="Branch Manager (Optional)">
+                <com.google.android.material.textfield.MaterialAutoCompleteTextView
                     android:id="@+id/et_manager_id"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:inputType="text"/>
+                    android:inputType="none"/>
             </com.google.android.material.textfield.TextInputLayout>
 
             <com.google.android.material.textfield.TextInputLayout

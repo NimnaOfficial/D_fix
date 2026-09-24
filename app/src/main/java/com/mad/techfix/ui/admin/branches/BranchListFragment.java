@@ -18,6 +18,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.mad.techfix.R;
 import com.mad.techfix.models.admin.Branch;
+import com.mad.techfix.models.admin.Manager;
 import com.mad.techfix.ui.admin.adapters.BranchAdapter;
 import com.mad.techfix.viewmodel.AdminViewModel;
 
@@ -25,6 +26,7 @@ public class BranchListFragment extends Fragment {
 
     private AdminViewModel viewModel;
     private BranchAdapter adapter;
+    private java.util.List<Manager> allManagers = new java.util.ArrayList<>();
     private ProgressBar progressBar;
     private TextView tvEmptyState;
     private RecyclerView recyclerBranches;
@@ -54,6 +56,7 @@ public class BranchListFragment extends Fragment {
 
         observeViewModel();
         viewModel.loadBranches();
+        viewModel.loadManagers();
     }
 
     private void showBranchDialog(@Nullable Branch branch) {
@@ -69,7 +72,7 @@ public class BranchListFragment extends Fragment {
         TextInputEditText etAddress = view.findViewById(R.id.et_branch_address);
         TextInputEditText etCity = view.findViewById(R.id.et_branch_city);
         TextInputEditText etPhone = view.findViewById(R.id.et_branch_phone);
-        TextInputEditText etManager = view.findViewById(R.id.et_manager_id);
+        android.widget.AutoCompleteTextView etManager = view.findViewById(R.id.et_manager_id);
         TextInputEditText etEmail = view.findViewById(R.id.et_branch_email);
         TextInputEditText etLat = view.findViewById(R.id.et_branch_lat);
         TextInputEditText etLng = view.findViewById(R.id.et_branch_lng);
@@ -84,6 +87,16 @@ public class BranchListFragment extends Fragment {
         etClosing.setClickable(true);
         etClosing.setOnClickListener(v -> showTimePicker(etClosing, "Select Closing Time"));
 
+        java.util.List<String> managerOptions = new java.util.ArrayList<>();
+        managerOptions.add("None");
+        for (Manager m : allManagers) {
+            if ("MANAGER".equalsIgnoreCase(m.getRole()) && (m.getBranchId() == null || (branch != null && m.getId().equals(branch.getManagerId())))) {
+                managerOptions.add(m.getId() + " - " + m.getFirstName() + " " + m.getLastName());
+            }
+        }
+        android.widget.ArrayAdapter<String> managerAdapter = new android.widget.ArrayAdapter<>(requireContext(), android.R.layout.simple_dropdown_item_1line, managerOptions);
+        etManager.setAdapter(managerAdapter);
+
         View btnSave = view.findViewById(R.id.btn_save);
         View btnCancel = view.findViewById(R.id.btn_cancel);
         View btnDelete = view.findViewById(R.id.btn_delete);
@@ -94,7 +107,20 @@ public class BranchListFragment extends Fragment {
             etAddress.setText(branch.getAddress());
             etCity.setText(branch.getCity());
             etPhone.setText(branch.getPhone());
-            etManager.setText(branch.getManagerId());
+            
+            String displayManager = "None";
+            if (branch.getManagerId() != null) {
+                for (Manager m : allManagers) {
+                    if (m.getId().equals(branch.getManagerId())) {
+                        displayManager = m.getId() + " - " + m.getFirstName() + " " + m.getLastName();
+                        break;
+                    }
+                }
+                if (displayManager.equals("None")) {
+                    displayManager = branch.getManagerId(); // fallback
+                }
+            }
+            etManager.setText(displayManager, false);
             etEmail.setText(branch.getEmail());
             etLat.setText(String.valueOf(branch.getLatitude()));
             etLng.setText(String.valueOf(branch.getLongitude()));
@@ -117,7 +143,11 @@ public class BranchListFragment extends Fragment {
             String addressStr = etAddress.getText() != null ? etAddress.getText().toString().trim() : "";
             String cityStr = etCity.getText() != null ? etCity.getText().toString().trim() : "";
             String phoneStr = etPhone.getText() != null ? etPhone.getText().toString().trim() : "";
-            String managerStr = etManager.getText() != null ? etManager.getText().toString().trim() : "";
+            String managerRawStr = etManager.getText() != null ? etManager.getText().toString().trim() : "";
+            String managerStr = "";
+            if (!managerRawStr.isEmpty() && !managerRawStr.equals("None")) {
+                managerStr = managerRawStr.split(" - ")[0];
+            }
 
             if (nameStr.isEmpty()) { etName.setError("Name is required"); etName.requestFocus(); return; }
             if (addressStr.isEmpty()) { etAddress.setError("Address is required"); etAddress.requestFocus(); return; }
@@ -165,7 +195,8 @@ public class BranchListFragment extends Fragment {
         viewModel.getCrudSuccess().observe(getViewLifecycleOwner(), success -> {
             if (success != null && success) {
                 Toast.makeText(getContext(), "Operation Successful!", Toast.LENGTH_SHORT).show();
-                viewModel.loadBranches(); // Reload list on DB update
+                viewModel.loadBranches();
+        viewModel.loadManagers(); // Reload list on DB update
             }
         });
     }

@@ -43,10 +43,10 @@ public interface AdminApiService {
     @POST("api/admin/users")
     Call<ApiResponse<Void>> createManager(@Header("Authorization") String auth, @Body com.mad.techfix.models.admin.Manager manager);
 
-    @PUT("api/admin/managers/{id}")
+    @PUT("api/admin/users/{id}")
     Call<ApiResponse<Void>> updateManager(@Header("Authorization") String auth, @Path("id") String id, @Body com.mad.techfix.models.admin.Manager manager);
 
-    @DELETE("api/admin/managers/{id}")
+    @DELETE("api/admin/users/{id}")
     Call<ApiResponse<Void>> deleteManager(@Header("Authorization") String auth, @Path("id") String id);
     @GET("api/admin/system/overview")
     Call<ApiResponse<SysAdminOverviewResponse>> getSystemOverview(@Header("Authorization") String auth);
