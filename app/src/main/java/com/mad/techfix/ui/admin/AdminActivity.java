@@ -48,8 +48,8 @@ public class AdminActivity extends AppCompatActivity {
             } else if (id == R.id.nav_technicians) {
                 loadFragment(new TechnicianListFragment());
                 return true;
-            } else if (id == R.id.nav_reports) {
-                loadFragment(new com.mad.techfix.ui.admin.dashboard.ReportsFragment());
+            } else if (id == R.id.nav_profile) {
+                loadFragment(new com.mad.techfix.ui.admin.profile.ManagerProfileFragment());
                 return true;
             }
             return false;

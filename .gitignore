@@ -48,3 +48,7 @@ node_modules/
 mem3/
 member1/
 mem/
+
+.dev.vars
+.env
+.env.*

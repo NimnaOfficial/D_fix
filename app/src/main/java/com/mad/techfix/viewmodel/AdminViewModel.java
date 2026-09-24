@@ -403,6 +403,33 @@ public class AdminViewModel extends AndroidViewModel {
         });
     }
 
+    public void suspendAppointment(String aptId) {
+        String token = getToken(); if(token == null) return;
+        isLoading.setValue(true);
+        repository.suspendAppointment(token, aptId, new AdminRepository.AdminCallback<Void>() {
+            @Override public void onSuccess(Void result) { isLoading.setValue(false); loadAllAppointments(); }
+            @Override public void onError(String error) { isLoading.setValue(false); errorMessage.setValue(error); }
+        });
+    }
+
+    public void resumeAppointment(String aptId) {
+        String token = getToken(); if(token == null) return;
+        isLoading.setValue(true);
+        repository.resumeAppointment(token, aptId, new AdminRepository.AdminCallback<Void>() {
+            @Override public void onSuccess(Void result) { isLoading.setValue(false); loadAllAppointments(); }
+            @Override public void onError(String error) { isLoading.setValue(false); errorMessage.setValue(error); }
+        });
+    }
+
+    public void removeAppointment(String aptId) {
+        String token = getToken(); if(token == null) return;
+        isLoading.setValue(true);
+        repository.removeAppointment(token, aptId, new AdminRepository.AdminCallback<Void>() {
+            @Override public void onSuccess(Void result) { isLoading.setValue(false); loadAllAppointments(); }
+            @Override public void onError(String error) { isLoading.setValue(false); errorMessage.setValue(error); }
+        });
+    }
+
     public void assignTechnician(String appointmentId, String technicianId) {
         String token = getToken();
         if (token == null) return;

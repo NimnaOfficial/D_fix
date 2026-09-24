@@ -1,20 +1,26 @@
 import re
 
-with open('app/src/main/java/com/mad/techfix/ui/history/RepairHistoryDetailFragment.java', 'r', encoding='utf-8') as f:
+with open("app/src/main/java/com/mad/techfix/ui/payment/PaymentFragment.java", "r", encoding="utf-8") as f:
     content = f.read()
 
-target = r'View btnPayment = view\.findViewById\(R\.id\.btn_payment\);'
+import_pattern = r"(import com\.stripe\.android\.Stripe;)"
+import_repl = r"\1\nimport com.stripe.android.PaymentConfiguration;"
 
-replacement = '''View btnPayment = view.findViewById(R.id.btn_payment);
-        com.mad.techfix.data.SessionManager sessionManager = new com.mad.techfix.data.SessionManager(requireContext());
-        if (!"CUSTOMER".equalsIgnoreCase(sessionManager.getUserRole())) {
-            btnPayment.setVisibility(View.GONE);
-        }'''
+content = re.sub(import_pattern, import_repl, content)
 
-if target in content:
-    content = content.replace(target, replacement)
-    with open('app/src/main/java/com/mad/techfix/ui/history/RepairHistoryDetailFragment.java', 'w', encoding='utf-8') as f:
-        f.write(content)
-    print("Success fixing payment button visibility")
-else:
-    print("Failed to find btnPayment declaration")
+oncreate_pattern = r"(@Nullable\s*@Override\s*public View onCreateView)"
+oncreate_repl = """@Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        PaymentConfiguration.init(requireContext(), StripeConfig.PUBLISHABLE_KEY);
+    }
+
+    \\1"""
+
+content = re.sub(oncreate_pattern, oncreate_repl, content)
+
+with open("app/src/main/java/com/mad/techfix/ui/payment/PaymentFragment.java", "w", encoding="utf-8") as f:
+    f.write(content)
+
+print("Fixed PaymentFragment.")
+

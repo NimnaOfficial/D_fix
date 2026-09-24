@@ -80,8 +80,10 @@ public class AppointmentsFragment extends Fragment {
                     appointment.getBranch_id(),
                     appointment.getService_id(),
                     appointment.getService_name(),
-                    appointment.getBranch_name()
-            );
+                      appointment.getBranch_name(),
+                      appointment.getTechnician_name(),
+                      appointment.getTechnician_status()
+              );
             detailSheet.show(getParentFragmentManager(), "AppointmentDetail");
         });
         recyclerView.setAdapter(adapter);

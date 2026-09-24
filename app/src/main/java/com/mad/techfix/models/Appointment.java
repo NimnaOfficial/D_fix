@@ -57,6 +57,7 @@ public class Appointment {
     private String technician_first_name;
     private String technician_last_name;
     private String technician_name;
+    private String technician_status;
 
 
     public String getId() {
@@ -439,6 +440,13 @@ public class Appointment {
                 technician_last_name;
     }
 
+
+    public String getTechnician_status() {
+        return technician_status;
+    }
+    public void setTechnician_status(String technician_status) {
+        this.technician_status = technician_status;
+    }
 
     public String getTechnician_name() {
         return technician_name;

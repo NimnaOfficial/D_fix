@@ -118,13 +118,103 @@
             android:textColor="@color/app_text_primary" />
     </LinearLayout>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/btn_action"
+        <LinearLayout
+        android:id="@+id/ll_tech_info"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:text="Assign Technician"
-        app:cornerRadius="12dp"
-        app:icon="@drawable/ic_technician" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:layout_marginBottom="24dp">
+        
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/app_divider"
+            android:layout_marginBottom="12dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="12dp">
+            <TextView
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Technician"
+                android:textColor="@color/app_text_secondary" />
+            <TextView
+                android:id="@+id/tv_detail_technician"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="N/A"
+                android:textStyle="bold"
+                android:textColor="@color/app_text_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <TextView
+                android:layout_width="120dp"
+                android:layout_height="wrap_content"
+                android:text="Current Activity"
+                android:textColor="@color/app_text_secondary" />
+            <TextView
+                android:id="@+id/tv_detail_tech_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="AVAILABLE"
+                android:textStyle="bold"
+                android:textColor="@color/app_text_primary" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/ll_manager_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_action"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Assign Technician"
+            app:cornerRadius="12dp"
+            app:icon="@drawable/ic_technician" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_suspend"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Suspend Appointment"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:backgroundTint="#FF9800"
+            app:cornerRadius="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_resume"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Resume Appointment"
+            android:layout_marginTop="8dp"
+            android:visibility="gone"
+            app:backgroundTint="#4CAF50"
+            app:cornerRadius="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_remove"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:text="Remove Appointment"
+            android:textColor="@color/app_error"
+            app:strokeColor="@color/app_error"
+            android:layout_marginTop="8dp"
+            app:cornerRadius="12dp" />
+    </LinearLayout>
 
 </LinearLayout>
 

@@ -459,6 +459,42 @@ export default {
         });
       }
 
+            if (path === "/api/auth/profile" && request.method === "PUT") {
+        const userReq = await authenticate(request, env);
+        if (!userReq) return json({ success: false, message: "Unauthorized" }, 401);
+        
+        const { first_name, last_name, phone } = await request.json();
+        if (!first_name || !last_name) return json({ success: false, message: "First and Last name required" }, 400);
+
+        await env.DB.prepare("UPDATE users SET first_name = ?, last_name = ?, phone = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(first_name.trim(), last_name.trim(), phone ? phone.trim() : null, userReq.id)
+          .run();
+          
+        return json({ success: true, message: "Profile updated successfully" });
+      }
+
+      if (path === "/api/auth/password" && request.method === "PUT") {
+        const userReq = await authenticate(request, env);
+        if (!userReq) return json({ success: false, message: "Unauthorized" }, 401);
+
+        const { current_password, new_password } = await request.json();
+        if (!current_password || !new_password) return json({ success: false, message: "Passwords required" }, 400);
+        if (new_password.length < 8) return json({ success: false, message: "New password must be at least 8 chars" }, 400);
+
+        const user = await env.DB.prepare("SELECT password_hash FROM users WHERE id = ?").bind(userReq.id).first();
+        if (!user) return json({ success: false, message: "User not found" }, 404);
+
+        if (user.password_hash !== await hashPassword(current_password)) {
+           return json({ success: false, message: "Incorrect current password" }, 400);
+        }
+
+        await env.DB.prepare("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .bind(await hashPassword(new_password), userReq.id)
+          .run();
+          
+        return json({ success: true, message: "Password updated successfully" });
+      }
+
       if (path === "/api/auth/me" && request.method === "GET") {
         const userReq = await authenticate(request, env);
         if (!userReq)
@@ -786,7 +822,8 @@ export default {
              COALESCE(tu.first_name, '') || ' ' || COALESCE(tu.last_name, '')
            )
            ELSE NULL
-         END AS technician_name
+         END AS technician_name,
+         t.availability_status AS technician_status
 
        FROM appointments a
 
@@ -1248,6 +1285,9 @@ export default {
               if (!appt) {
                 return json({ success: false, message: "Appointment not found" }, 404);
               }
+              if (appt.status === "SUSPENDED") {
+                return json({ success: false, message: "Connection is on hold. Appointment is suspended." }, 403);
+              }
               
               let receiver_id = "UNKNOWN";
               if (user.role === "CUSTOMER") {
@@ -1412,7 +1452,8 @@ export default {
               CASE WHEN cu.first_name IS NOT NULL OR cu.last_name IS NOT NULL THEN TRIM(COALESCE(cu.first_name, '') || ' ' || COALESCE(cu.last_name, '')) ELSE NULL END AS customer_name,
               tu.first_name AS technician_first_name,
               tu.last_name AS technician_last_name,
-              CASE WHEN tu.first_name IS NOT NULL OR tu.last_name IS NOT NULL THEN TRIM(COALESCE(tu.first_name, '') || ' ' || COALESCE(tu.last_name, '')) ELSE NULL END AS technician_name
+              CASE WHEN tu.first_name IS NOT NULL OR tu.last_name IS NOT NULL THEN TRIM(COALESCE(tu.first_name, '') || ' ' || COALESCE(tu.last_name, '')) ELSE NULL END AS technician_name,
+         t.availability_status AS technician_status
             FROM appointments a
             LEFT JOIN devices d ON d.id = a.device_id
             LEFT JOIN services s ON s.id = a.service_id
@@ -1429,7 +1470,8 @@ export default {
         if (!appointment)
           return json({ success: false, message: "Appointment not found" }, 404);
 
-        if (user.role === "CUSTOMER" && appointment.customer_id !== user.id) {
+        if (appointment.status === 'SUSPENDED') return json({ success: false, message: "Cannot update status of a suspended appointment" }, 403);
+          if (user.role === "CUSTOMER" && appointment.customer_id !== user.id) {
           return json({ success: false, message: "Access denied" }, 403);
         }
         if (user.role === "MANAGER" && appointment.branch_id !== user.managerBranchId) {
@@ -1543,7 +1585,8 @@ if (path === "/api/technician/appointments" && request.method === "GET") {
             COALESCE(tu.first_name, '') || ' ' || COALESCE(tu.last_name, '')
           )
           ELSE NULL
-        END AS technician_name
+        END AS technician_name,
+         t.availability_status AS technician_status
 
       FROM appointments a
 
@@ -1996,6 +2039,57 @@ if (
             500,
           );
         }
+      }
+
+            // ==========================================
+      // MANAGER APPOINTMENT CONTROLS
+      // ==========================================
+      if (path.startsWith("/api/appointments/") && path.endsWith("/suspend") && request.method === "PUT") {
+        const user = await authenticate(request, env);
+        if (!user || user.role !== "MANAGER") return json({ success: false, message: "Access denied. Managers only." }, 403);
+        const aptId = path.split("/")[3];
+        const apt = await env.DB.prepare("SELECT branch_id FROM appointments WHERE id = ?").bind(aptId).first();
+        if (!apt) return json({ success: false, message: "Not found" }, 404);
+        if (apt.branch_id !== user.managerBranchId) return json({ success: false, message: "Access denied: Branch mismatch" }, 403);
+        await env.DB.prepare("UPDATE appointments SET status = 'SUSPENDED', updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(aptId).run();
+        await env.DB.prepare("INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, 'SUSPENDED', 'Manager suspended appointment', ?)").bind(crypto.randomUUID(), aptId, user.id).run();
+        return json({ success: true, message: "Appointment suspended" });
+      }
+
+      if (path.startsWith("/api/appointments/") && path.endsWith("/resume") && request.method === "PUT") {
+        const user = await authenticate(request, env);
+        if (!user || user.role !== "MANAGER") return json({ success: false, message: "Access denied. Managers only." }, 403);
+        const aptId = path.split("/")[3];
+        const apt = await env.DB.prepare("SELECT branch_id FROM appointments WHERE id = ?").bind(aptId).first();
+        if (!apt) return json({ success: false, message: "Not found" }, 404);
+        if (apt.branch_id !== user.managerBranchId) return json({ success: false, message: "Access denied: Branch mismatch" }, 403);
+        const lastStatus = await env.DB.prepare("SELECT status FROM repair_status_history WHERE appointment_id = ? AND status != 'SUSPENDED' ORDER BY created_at DESC LIMIT 1").bind(aptId).first();
+        const revertStatus = lastStatus ? lastStatus.status : "ASSIGNED";
+        await env.DB.prepare("UPDATE appointments SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").bind(revertStatus, aptId).run();
+        await env.DB.prepare("INSERT INTO repair_status_history (id, appointment_id, status, note, changed_by) VALUES (?, ?, ?, 'Manager resumed appointment', ?)").bind(crypto.randomUUID(), aptId, revertStatus, user.id).run();
+        return json({ success: true, message: "Appointment resumed" });
+      }
+
+      if (path.startsWith("/api/appointments/") && path.split("/").length === 4 && request.method === "DELETE") {
+        const user = await authenticate(request, env);
+        if (!user || user.role !== "MANAGER") return json({ success: false, message: "Access denied. Managers only." }, 403);
+        const aptId = path.split("/")[3];
+        const apt = await env.DB.prepare("SELECT branch_id, technician_id FROM appointments WHERE id = ?").bind(aptId).first();
+        if (!apt) return json({ success: false, message: "Not found" }, 404);
+        if (apt.branch_id !== user.managerBranchId) return json({ success: false, message: "Access denied: Branch mismatch" }, 403);
+        if (apt.technician_id) {
+             await env.DB.prepare("UPDATE technicians SET availability_status = 'AVAILABLE' WHERE id = ?").bind(apt.technician_id).run();
+        }
+        await env.DB.batch([
+            env.DB.prepare("DELETE FROM messages WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM repair_status_history WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM payments WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM repair_images WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM notifications WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM appointment_parts WHERE appointment_id = ?").bind(aptId),
+            env.DB.prepare("DELETE FROM appointments WHERE id = ?").bind(aptId)
+        ]);
+        return json({ success: true, message: "Appointment permanently removed" });
       }
 
       // ==========================================

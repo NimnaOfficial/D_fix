@@ -68,6 +68,15 @@ public interface AdminApiService {
     @PUT("api/technicians/{id}/services")
     Call<ApiResponse<Object>> updateTechnicianServices(@Header("Authorization") String auth, @Path("id") String technicianId, @Body UpdateTechServicesRequest request);
 
+    @PUT("api/appointments/{id}/suspend")
+    Call<ApiResponse<Object>> suspendAppointment(@Header("Authorization") String auth, @Path("id") String appointmentId);
+
+    @PUT("api/appointments/{id}/resume")
+    Call<ApiResponse<Object>> resumeAppointment(@Header("Authorization") String auth, @Path("id") String appointmentId);
+
+    @DELETE("api/appointments/{id}")
+    Call<ApiResponse<Object>> removeAppointment(@Header("Authorization") String auth, @Path("id") String appointmentId);
+
     @PUT("api/appointments/{id}/assign")
     Call<ApiResponse<Object>> assignTechnician(@Header("Authorization") String auth, @Path("id") String appointmentId, @Body AssignTechnicianRequest request);
 

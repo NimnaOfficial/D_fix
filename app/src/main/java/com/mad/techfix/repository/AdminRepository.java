@@ -216,6 +216,36 @@ public class AdminRepository {
     }
 
     // --- Assign Technician ---
+    public void suspendAppointment(String token, String aptId, AdminCallback<Void> callback) {
+        apiService.suspendAppointment(token, aptId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> response) {
+                if(response.isSuccessful() && response.body() != null && response.body().isSuccess()) callback.onSuccess(null);
+                else callback.onError("Failed to suspend");
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable t) { callback.onError(t.getMessage()); }
+        });
+    }
+
+    public void resumeAppointment(String token, String aptId, AdminCallback<Void> callback) {
+        apiService.resumeAppointment(token, aptId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> response) {
+                if(response.isSuccessful() && response.body() != null && response.body().isSuccess()) callback.onSuccess(null);
+                else callback.onError("Failed to resume");
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable t) { callback.onError(t.getMessage()); }
+        });
+    }
+
+    public void removeAppointment(String token, String aptId, AdminCallback<Void> callback) {
+        apiService.removeAppointment(token, aptId).enqueue(new retrofit2.Callback<ApiResponse<Object>>() {
+            @Override public void onResponse(retrofit2.Call<ApiResponse<Object>> call, retrofit2.Response<ApiResponse<Object>> response) {
+                if(response.isSuccessful() && response.body() != null && response.body().isSuccess()) callback.onSuccess(null);
+                else callback.onError("Failed to remove");
+            }
+            @Override public void onFailure(retrofit2.Call<ApiResponse<Object>> call, Throwable t) { callback.onError(t.getMessage()); }
+        });
+    }
+
     public void assignTechnician(String token, String appointmentId, String technicianId, AdminCallback<Void> callback) {
         AssignTechnicianRequest request = new AssignTechnicianRequest(technicianId);
         apiService.assignTechnician(token, appointmentId, request).enqueue(new Callback<ApiResponse<Object>>() {
