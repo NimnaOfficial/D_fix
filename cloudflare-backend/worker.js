@@ -2372,7 +2372,7 @@ if (
           );
 
         const allUsers = await env.DB.prepare(
-          `SELECT id, first_name, last_name, email, phone, role, profile_image_url, is_active, created_at, updated_at FROM users ORDER BY created_at DESC`,
+          `SELECT u.id, u.first_name, u.last_name, u.email, u.phone, u.role, u.profile_image_url, u.is_active, u.created_at, u.updated_at, COALESCE(b.id, t.branch_id) as branch_id FROM users u LEFT JOIN branches b ON b.manager_id = u.id LEFT JOIN technicians t ON t.user_id = u.id ORDER BY u.created_at DESC`,
         ).all();
         return json({ success: true, data: allUsers.results });
       }
@@ -2392,7 +2392,7 @@ if (
           phone,
           password,
           role,
-          is_active,
+          is_active, branch_id,
         } = await request.json();
         if (!email || !password || password.length < 6 || !role)
           return json(
@@ -2452,8 +2452,11 @@ if (
             storedPasswordHash,
             role.toUpperCase(),
             is_active !== undefined ? is_active : 1,
-          )
-          .run();
+          ).run();
+          if (role.toUpperCase() === "MANAGER" && branch_id) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ?`).bind(userId).run();
+            await env.DB.prepare(`UPDATE branches SET manager_id = ? WHERE id = ?`).bind(userId, branch_id).run();
+          }
 
         return json({ success: true, message: "User created successfully" });
       }
@@ -2564,7 +2567,7 @@ if (
           );
 
         const targetId = path.split("/")[4];
-        const { first_name, last_name, phone, role, is_active, password } =
+        const { first_name, last_name, phone, role, is_active, password, branch_id } =
           await request.json();
 
         // If admin provided a new password, overwrite it
@@ -2606,9 +2609,14 @@ if (
               is_active !== undefined ? is_active : 1,
               storedPasswordHash,
               targetId,
-            )
-            .run();
-        } else {
+            ).run();
+          }
+          if (role && role.toUpperCase() === "MANAGER" && branch_id) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ?`).bind(targetId).run();
+            await env.DB.prepare(`UPDATE branches SET manager_id = ? WHERE id = ?`).bind(targetId, branch_id).run();
+          } else if (role && role.toUpperCase() === "MANAGER" && branch_id === null) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ?`).bind(targetId).run();
+          } else {
           await env.DB.prepare(
             `
                     UPDATE users SET first_name = ?, last_name = ?, phone = ?, role = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -2621,9 +2629,14 @@ if (
               role.toUpperCase(),
               is_active !== undefined ? is_active : 1,
               targetId,
-            )
-            .run();
-        }
+            ).run();
+          }
+          if (role && role.toUpperCase() === "MANAGER" && branch_id) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ?`).bind(targetId).run();
+            await env.DB.prepare(`UPDATE branches SET manager_id = ? WHERE id = ?`).bind(targetId, branch_id).run();
+          } else if (role && role.toUpperCase() === "MANAGER" && branch_id === null) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ?`).bind(targetId).run();
+          }
 
         return json({ success: true, message: "User updated successfully" });
       }
@@ -2682,10 +2695,14 @@ if (
             latitude || null,
             longitude || null,
             opening_time || null,
-              closing_time || null,
-              manager_id || null,
-            )
+            closing_time || null,
+            manager_id || null,
+          )
           .run();
+
+        if (manager_id) {
+          await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ? AND id != ?`).bind(manager_id, branchId).run();
+        }
 
         const newBranch = await env.DB.prepare(
           `SELECT * FROM branches WHERE id = ?`,
@@ -2735,11 +2752,16 @@ if (
               latitude || null,
               longitude || null,
               opening_time || null,
-                closing_time || null,
-                manager_id || null,
-                branchId,
-              )
+              closing_time || null,
+              manager_id || null,
+              branchId,
+            )
             .run();
+
+          if (manager_id) {
+            await env.DB.prepare(`UPDATE branches SET manager_id = NULL WHERE manager_id = ? AND id != ?`).bind(manager_id, branchId).run();
+          }
+
           const updated = await env.DB.prepare(
             `SELECT * FROM branches WHERE id = ?`,
           )

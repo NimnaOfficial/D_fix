@@ -81,6 +81,21 @@
         android:layout_marginBottom="12dp"
         android:entries="@array/role_options"/>
 
+    <TextView
+        android:id="@+id/tv_branch_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Assign to Branch"
+        android:textSize="12sp"
+        android:layout_marginTop="4dp"
+        android:visibility="gone"/>
+    <Spinner
+        android:id="@+id/spinner_branch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"
+        android:visibility="gone"/>
+
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

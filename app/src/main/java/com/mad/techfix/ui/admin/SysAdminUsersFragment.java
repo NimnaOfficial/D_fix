@@ -33,6 +33,7 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
     private ManagerAdapter adapter;
     private ProgressBar progressBar;
     private List<Manager> allUsers = new ArrayList<>();
+    private List<com.mad.techfix.models.admin.Branch> availableBranches = new ArrayList<>();
     private String currentRoleFilter = "ALL";
 
     @Nullable
@@ -53,6 +54,11 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
         rvManagers.setLayoutManager(new LinearLayoutManager(getContext()));
         adapter = new ManagerAdapter(this);
         rvManagers.setAdapter(adapter);
+        viewModel.getBranches().observe(getViewLifecycleOwner(), branches -> {
+            this.availableBranches = branches != null ? branches : new ArrayList<>();
+        });
+        viewModel.loadBranches();
+
 
         chipGroup.setOnCheckedStateChangeListener((group, checkedIds) -> {
             if (!checkedIds.isEmpty()) {
@@ -246,6 +252,34 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
         TextInputEditText etPassword = view.findViewById(R.id.et_password);
         Spinner spinnerRole = view.findViewById(R.id.spinner_role);
         SwitchMaterial switchActive = view.findViewById(R.id.switch_active);
+        TextView tvBranchLabel = view.findViewById(R.id.tv_branch_label);
+        Spinner spinnerBranch = view.findViewById(R.id.spinner_branch);
+
+        
+        List<String> branchNames = new ArrayList<>();
+        branchNames.add("None");
+        for (com.mad.techfix.models.admin.Branch b : availableBranches) {
+            branchNames.add(b.getName() + " (" + b.getCity() + ")");
+        }
+        android.widget.ArrayAdapter<String> branchAdapter = new android.widget.ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, branchNames);
+        branchAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        spinnerBranch.setAdapter(branchAdapter);
+
+        spinnerRole.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(android.widget.AdapterView<?> parent, View view, int position, long id) {
+                String selectedRole = parent.getItemAtPosition(position).toString();
+                if ("MANAGER".equalsIgnoreCase(selectedRole) || "TECHNICIAN".equalsIgnoreCase(selectedRole)) {
+                    tvBranchLabel.setVisibility(View.VISIBLE);
+                    spinnerBranch.setVisibility(View.VISIBLE);
+                } else {
+                    tvBranchLabel.setVisibility(View.GONE);
+                    spinnerBranch.setVisibility(View.GONE);
+                }
+            }
+            @Override
+            public void onNothingSelected(android.widget.AdapterView<?> parent) {}
+        });
 
         if (existingUser != null) {
             etFirstName.setText(existingUser.getFirstName());
@@ -253,6 +287,14 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
             etEmail.setText(existingUser.getEmail());
             etPhone.setText(existingUser.getPhone());
             switchActive.setChecked(existingUser.getIsActive() == 1);
+            if (existingUser.getBranchId() != null) {
+                for (int i = 0; i < availableBranches.size(); i++) {
+                    if (existingUser.getBranchId().equals(availableBranches.get(i).getId())) {
+                        spinnerBranch.setSelection(i + 1); // +1 for "None"
+                        break;
+                    }
+                }
+            }
             
             String[] roles = getResources().getStringArray(R.array.role_options);
             for (int i = 0; i < roles.length; i++) {
@@ -271,7 +313,15 @@ public class SysAdminUsersFragment extends Fragment implements ManagerAdapter.On
             user.setEmail(etEmail.getText().toString().trim());
             user.setPhone(etPhone.getText().toString().trim());
             user.setRole(spinnerRole.getSelectedItem().toString());
+            
             user.setIsActive(switchActive.isChecked() ? 1 : 0);
+            
+            if (tvBranchLabel.getVisibility() == View.VISIBLE && spinnerBranch.getSelectedItemPosition() > 0) {
+                user.setBranchId(availableBranches.get(spinnerBranch.getSelectedItemPosition() - 1).getId());
+            } else {
+                user.setBranchId(null);
+            }
+
             
             String newPassword = etPassword.getText().toString().trim();
             if (!newPassword.isEmpty()) {
